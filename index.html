@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>L-1グランプリ | Division対抗ポイントバトル</title>
+<style>
+  :root {
+    --bg: #0f1420; --panel: #1a2233; --panel2: #232e45; --line: #2e3b57;
+    --text: #e8edf7; --muted: #93a1bd; --accent: #f5b301; --add: #3ddc84; --deduct: #ff5d6c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif; background: var(--bg); color: var(--text); }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 16px; }
+  header h1 { font-size: 22px; margin: 8px 0 2px; }
+  header .sub { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  .tabs { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+  .tabs button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; font-size: 14px; }
+  .tabs button.active { background: var(--accent); color: #1a1a1a; border-color: var(--accent); font-weight: 700; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 16px; margin: 0 0 12px; }
+  select, input, textarea { width: 100%; background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; font-size: 14px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  .btn { background: var(--accent); color: #1a1a1a; border: none; border-radius: 8px; padding: 10px 18px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 14px; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+  th { color: var(--muted); font-size: 12px; font-weight: 600; }
+  .rank { font-weight: 800; font-size: 16px; width: 48px; }
+  .rank1 { color: var(--accent); }
+  .pts { font-weight: 800; font-size: 16px; text-align: right; white-space: nowrap; }
+  .bar-outer { background: var(--panel2); border-radius: 6px; height: 10px; overflow: hidden; }
+  .bar { height: 100%; background: linear-gradient(90deg, #f5b301, #ffd75e); border-radius: 6px; }
+  .add { color: var(--add); font-weight: 700; }
+  .deduct { color: var(--deduct); font-weight: 700; }
+  .blackout { text-align: center; padding: 32px 12px; }
+  .blackout .big { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
+  .blackout p { color: var(--muted); font-size: 14px; margin: 4px 0; }
+  .msg { border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-top: 12px; display: none; }
+  .msg.okmsg { background: rgba(61,220,132,.12); color: var(--add); display: block; }
+  .msg.ngmsg { background: rgba(255,93,108,.12); color: var(--deduct); display: block; white-space: pre-wrap; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .feeditem { display: flex; justify-content: space-between; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .feeditem .left { min-width: 0; }
+  .feeditem .date { color: var(--muted); margin-right: 8px; }
+  .hidden { display: none !important; }
+  #loading { color: var(--muted); padding: 24px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🏆 L-1グランプリ</h1>
+    <div class="sub">Division対抗ポイントバトル — 全員でリスクを防ぎ、挑戦と貢献でチームを救うサバイバル</div>
+  </header>
+
+  <div class="tabs">
+    <button id="tabSeason" class="active">シーズン順位</button>
+    <button id="tabAnnual">年間集計</button>
+    <button id="tabApply">ポイント申請</button>
+  </div>
+
+  <div id="loading">読み込み中...</div>
+  <div id="errBox" class="msg"></div>
+
+  <!-- シーズン順位 -->
+  <section id="secSeason" class="hidden">
+    <div class="card">
+      <label for="seasonSel">シーズン</label>
+      <select id="seasonSel"></select>
+    </div>
+    <div class="card" id="standingsCard">
+      <h2 id="standingsTitle">現在の順位</h2>
+      <div id="standingsBody"></div>
+    </div>
+    <div class="card">
+      <h2>ポイント増減フィード</h2>
+      <div class="muted" id="feedNote">直近の加点・減点の記録です。</div>
+      <div id="feedBody"></div>
+    </div>
+  </section>
+
+  <!-- 年間集計 -->
+  <section id="secAnnual" class="hidden">
+    <div class="card">
+      <h2 id="annualTitle">年間集計（前半戦＋後半戦の合算）</h2>
+      <div id="annualBody"></div>
+    </div>
+  </section>
+
+  <!-- 申請 -->
+  <section id="secApply" class="hidden">
+    <div class="card">
+      <h2>ポイント申請</h2>
+      <div class="muted">申請内容は管理者の承認後にダッシュボードへ反映されます。</div>
+      <label for="apDivision">Division</label>
+      <select id="apDivision"></select>
+      <label for="apRule">項目</label>
+      <select id="apRule"></select>
+      <div id="apPointsWrap" class="hidden">
+        <label for="apPoints">ポイント（不定期missionのみ入力・加点は正の整数）</label>
+        <input id="apPoints" type="number" step="1" placeholder="例: 300">
+      </div>
+      <label for="apDate">発生日</label>
+      <input id="apDate" type="date">
+      <label for="apName">申請者名</label>
+      <input id="apName" type="text" maxlength="100" placeholder="氏名">
+      <label for="apNote">詳細・理由（管理者のみ閲覧）</label>
+      <textarea id="apNote" rows="3" maxlength="2000" placeholder="内容の補足があれば記入"></textarea>
+      <button class="btn" id="apSubmit">申請する</button>
+      <div id="apMsg" class="msg"></div>
+    </div>
+  </section>
+</div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
+import {
+  isBlackout, isAnnualBlackout, seasonForDate, calcStandings, calcAnnualStandings,
+  validateRequestInput, groupRules, buildFeed, formatPoints,
+} from './l1-core.js';
+
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = id => document.getElementById(id);
+const todayISO = () => new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD（ローカル日付）
+
+// 公開selectはnote列を含まないカラム指定（カラムGRANTと一致させる）
+const EVENT_COLS = 'id, season_id, division_id, rule_id, points, occurred_on, request_id, created_at, voided_at';
+
+let state = { divisions: [], seasons: [], rules: [], events: [], selectedSeasonId: null };
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function showErr(msg) { const b = $('errBox'); b.className = 'msg ngmsg'; b.textContent = msg; }
+
+async function loadAll() {
+  const [dv, ss, rl, ev] = await Promise.all([
+    sb.from('l1_divisions').select('*').order('display_order'),
+    sb.from('l1_seasons').select('*').order('starts_on'),
+    sb.from('l1_rules').select('*').order('display_order'),
+    sb.from('l1_events').select(EVENT_COLS).order('occurred_on', { ascending: false }).limit(2000),
+  ]);
+  for (const r of [dv, ss, rl, ev]) if (r.error) throw r.error;
+  state.divisions = dv.data; state.seasons = ss.data; state.rules = rl.data; state.events = ev.data;
+  const active = state.seasons.find(s => s.is_active) || seasonForDate(state.seasons, todayISO());
+  state.selectedSeasonId = active ? active.id : (state.seasons.at(-1)?.id ?? null);
+}
+
+function renderSeasonSelect() {
+  $('seasonSel').innerHTML = state.seasons.map(s =>
+    `<option value="${s.id}" ${s.id === state.selectedSeasonId ? 'selected' : ''}>${esc(s.name)}${s.is_active ? '（開催中）' : ''}</option>`
+  ).join('');
+}
+
+function standingsTable(rows, hidePts) {
+  const max = Math.max(1, ...rows.map(r => r.points));
+  return `<table><thead><tr><th>順位</th><th>Division</th><th style="width:34%">ポイント</th><th class="pts">L-Point</th></tr></thead><tbody>` +
+    rows.map(r => `
+      <tr>
+        <td class="rank ${r.rank === 1 ? 'rank1' : ''}">${hidePts ? '?' : r.rank}</td>
+        <td>${esc(r.name)}</td>
+        <td>${hidePts ? '<span class="muted">???</span>' : `<div class="bar-outer"><div class="bar" style="width:${Math.max(2, Math.round(r.points / max * 100))}%"></div></div>`}</td>
+        <td class="pts">${hidePts ? '???' : r.points.toLocaleString() + ' L'}</td>
+      </tr>`).join('') + `</tbody></table>`;
+}
+
+function renderStandings() {
+  const season = state.seasons.find(s => s.id === state.selectedSeasonId);
+  if (!season) { $('standingsBody').innerHTML = '<div class="muted">シーズンがありません</div>'; return; }
+  const seasonEvents = state.events.filter(e => e.season_id === season.id);
+  const rows = calcStandings({ season, divisions: state.divisions, events: seasonEvents });
+  const blackout = isBlackout(season, todayISO());
+  $('standingsTitle').textContent = `${season.name} 順位`;
+
+  if (blackout) {
+    $('standingsBody').innerHTML = `
+      <div class="blackout">
+        <div class="big">🤫 集計は決起会で発表！</div>
+        <p>結果発表月のため、順位と現在ポイントは非公開です。</p>
+        <p>ポイントの増減は下のフィードで確認できます。</p>
+      </div>`;
+  } else {
+    $('standingsBody').innerHTML = standingsTable(rows, false);
+  }
+
+  const feed = buildFeed({ events: seasonEvents, divisions: state.divisions, rules: state.rules, limit: 60 });
+  $('feedBody').innerHTML = feed.length === 0
+    ? '<div class="muted" style="padding:12px 0">まだ記録がありません。</div>'
+    : feed.map(f => `
+      <div class="feeditem">
+        <div class="left"><span class="date">${esc(f.occurred_on)}</span><b>${esc(f.division_name)}</b>　${esc(f.category)}<span class="muted">（${esc(f.label)}）</span></div>
+        <div class="${f.kind === 'add' ? 'add' : 'deduct'}">${esc(f.points_label)} L</div>
+      </div>`).join('');
+}
+
+function renderAnnual() {
+  const season = state.seasons.find(s => s.id === state.selectedSeasonId) || state.seasons.at(-1);
+  const cycle = season?.cycle;
+  if (!cycle) { $('annualBody').innerHTML = '<div class="muted">データがありません</div>'; return; }
+  $('annualTitle').textContent = `年間集計 ${cycle}（前半戦＋後半戦の合算）`;
+  if (isAnnualBlackout({ cycle, seasons: state.seasons }, todayISO())) {
+    $('annualBody').innerHTML = `
+      <div class="blackout">
+        <div class="big">🤫 年間王者は決起会で発表！</div>
+        <p>結果発表月のため、年間集計は非公開です。</p>
+      </div>`;
+    return;
+  }
+  const eventsBySeason = new Map(state.seasons.map(s => [s.id, state.events.filter(e => e.season_id === s.id)]));
+  const rows = calcAnnualStandings({ cycle, seasons: state.seasons, divisions: state.divisions, eventsBySeason });
+  $('annualBody').innerHTML = standingsTable(rows, false) +
+    '<div class="muted" style="margin-top:8px">※ 各シーズン初期1,000Lを含む合算値です</div>';
+}
+
+function renderApplyForm() {
+  $('apDivision').innerHTML = '<option value="">選択してください</option>' +
+    state.divisions.filter(d => d.is_active !== false).map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
+  const g = groupRules(state.rules);
+  const opt = r => `<option value="${r.id}">${esc(r.category)}｜${esc(r.label)}${r.is_variable ? '（pt都度設定）' : `（${formatPoints(r.points)}L）`}</option>`;
+  $('apRule').innerHTML = '<option value="">選択してください</option>' +
+    `<optgroup label="加点">${g.add.map(opt).join('')}</optgroup>` +
+    `<optgroup label="減点">${g.deduct.map(opt).join('')}</optgroup>`;
+  $('apDate').value = todayISO();
+}
+
+function currentRule() { return state.rules.find(r => r.id === $('apRule').value) || null; }
+
+async function submitRequest() {
+  const rule = currentRule();
+  const input = {
+    division_id: $('apDivision').value,
+    requester_name: $('apName').value,
+    occurred_on: $('apDate').value,
+    note: $('apNote').value,
+    points: $('apPoints').value,
+  };
+  const v = validateRequestInput(input, rule);
+  const msg = $('apMsg');
+  if (!v.ok) { msg.className = 'msg ngmsg'; msg.textContent = v.errors.join('\n'); return; }
+  $('apSubmit').disabled = true;
+  const payload = {
+    division_id: input.division_id,
+    rule_id: rule.id,
+    occurred_on: input.occurred_on,
+    requester_name: input.requester_name.trim(),
+    note: input.note || null,
+  };
+  if (rule.is_variable) payload.points = v.points;
+  const { error } = await sb.from('l1_requests').insert(payload);
+  $('apSubmit').disabled = false;
+  if (error) { msg.className = 'msg ngmsg'; msg.textContent = '申請に失敗しました: ' + error.message; return; }
+  msg.className = 'msg okmsg';
+  msg.textContent = '申請を受け付けました。管理者の承認後にダッシュボードへ反映されます。';
+  $('apNote').value = ''; $('apPoints').value = '';
+}
+
+function switchTab(tab) {
+  for (const [btn, sec] of [['tabSeason', 'secSeason'], ['tabAnnual', 'secAnnual'], ['tabApply', 'secApply']]) {
+    $(btn).classList.toggle('active', btn === tab);
+    $(sec).classList.toggle('hidden', btn !== tab);
+  }
+  if (tab === 'tabAnnual') renderAnnual();
+}
+
+async function init() {
+  try {
+    await loadAll();
+    $('loading').classList.add('hidden');
+    renderSeasonSelect(); renderStandings(); renderApplyForm();
+    $('secSeason').classList.remove('hidden');
+    $('seasonSel').addEventListener('change', e => { state.selectedSeasonId = e.target.value; renderStandings(); });
+    $('tabSeason').addEventListener('click', () => switchTab('tabSeason'));
+    $('tabAnnual').addEventListener('click', () => switchTab('tabAnnual'));
+    $('tabApply').addEventListener('click', () => switchTab('tabApply'));
+    $('apRule').addEventListener('change', () => {
+      $('apPointsWrap').classList.toggle('hidden', !currentRule()?.is_variable);
+    });
+    $('apSubmit').addEventListener('click', submitRequest);
+  } catch (e) {
+    $('loading').classList.add('hidden');
+    showErr('データの取得に失敗しました。config.jsのanonキー設定とスキーマ適用を確認してください。\n' + (e?.message ?? e));
+  }
+}
+init();
+</script>
+</body>
+</html>
