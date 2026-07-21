@@ -118,7 +118,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import {
-  isBlackout, isAnnualBlackout, seasonForDate, calcStandings, calcAnnualStandings,
+  isBlackout, isAnnualBlackout, seasonForDate, calcStandings, calcStandingsCarry, calcAnnualStandings,
   validateRequestInput, groupRules, buildFeed, formatPoints,
 } from './l1-core.js';
 
@@ -171,9 +171,11 @@ function renderStandings() {
   const season = state.seasons.find(s => s.id === state.selectedSeasonId);
   if (!season) { $('standingsBody').innerHTML = '<div class="muted">シーズンがありません</div>'; return; }
   const seasonEvents = state.events.filter(e => e.season_id === season.id);
-  const rows = calcStandings({ season, divisions: state.divisions, events: seasonEvents });
+  const eventsBySeason = new Map(state.seasons.map(s => [s.id, state.events.filter(e => e.season_id === s.id)]));
+  const rows = calcStandingsCarry({ season, seasons: state.seasons, divisions: state.divisions, eventsBySeason });
   const blackout = isBlackout(season, todayISO());
-  $('standingsTitle').textContent = `${season.name} 順位`;
+  const carried = !!season.carryover_from;
+  $('standingsTitle').textContent = `${season.name} 順位${carried ? '（前シーズンから持ち越し）' : ''}`;
 
   if (blackout) {
     $('standingsBody').innerHTML = `

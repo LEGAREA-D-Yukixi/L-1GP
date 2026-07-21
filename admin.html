@@ -128,6 +128,22 @@
       <h2 style="margin-top:20px">判定基準マスタ</h2>
       <div class="muted">ポイント変更は以後の登録に適用されます（過去のイベントは変わりません）。</div>
       <div id="ruleBody" style="margin-top:8px"></div>
+
+      <h2 style="margin-top:20px">判定基準の新規追加</h2>
+      <div class="row">
+        <div style="flex:0.5"><label>区分</label><select id="nrKind"><option value="add">加点</option><option value="deduct">減点</option></select></div>
+        <div><label>対象指標</label><input id="nrCategory" type="text" maxlength="30" placeholder="例: スキルアップ"></div>
+      </div>
+      <div class="row">
+        <div><label>内容</label><input id="nrLabel" type="text" maxlength="120" placeholder="例: 〇〇資格の取得"></div>
+        <div style="flex:0.4"><label>単位</label><input id="nrUnit" type="text" maxlength="10" value="回"></div>
+      </div>
+      <div class="row" style="align-items:center">
+        <div><label style="margin-top:0"><input type="checkbox" id="nrVariable" style="width:auto; vertical-align:middle"> 可変ポイント（不定期mission等・都度入力）</label></div>
+        <div id="nrPointsWrap"><label>ポイント（加点は正・減点は負の整数）</label><input id="nrPoints" type="number" step="1" placeholder="例: 100 / -100"></div>
+      </div>
+      <div style="margin-top:12px"><button class="btn" id="nrBtn">判定基準を追加</button></div>
+      <div id="nrMsg" class="msg"></div>
     </section>
 
     <!-- シーズン -->
@@ -166,7 +182,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import {
-  calcStandings, calcAnnualStandings, validateRequestInput, groupRules,
+  calcStandings, calcStandingsCarry, calcAnnualStandings, validateRequestInput, groupRules,
   formatPoints, seasonForDate, seasonActivationPlan,
 } from './l1-core.js';
 
@@ -345,11 +361,11 @@ function renderStandings() {
   const sid = $('stSeason').value || active?.id;
   const season = state.seasons.find(s => s.id === sid);
   if (!season) { $('stBody').innerHTML = '<div class="muted">シーズンがありません。</div>'; return; }
-  const rows = calcStandings({ season, divisions: state.divisions, events: state.events.filter(e => e.season_id === sid) });
+  const eventsBySeason = new Map(state.seasons.map(s => [s.id, state.events.filter(e => e.season_id === s.id)]));
+  const rows = calcStandingsCarry({ season, seasons: state.seasons, divisions: state.divisions, eventsBySeason });
   const table = rs => `<table><thead><tr><th>順位</th><th>Division</th><th style="text-align:right">L-Point</th></tr></thead><tbody>` +
     rs.map(r => `<tr><td class="${r.rank === 1 ? 'rank1' : ''}">${r.rank}</td><td>${esc(r.name)}</td><td style="text-align:right;font-weight:700">${r.points.toLocaleString()} L</td></tr>`).join('') + '</tbody></table>';
   $('stBody').innerHTML = table(rows);
-  const eventsBySeason = new Map(state.seasons.map(s => [s.id, state.events.filter(e => e.season_id === s.id)]));
   const annual = calcAnnualStandings({ cycle: season.cycle, seasons: state.seasons, divisions: state.divisions, eventsBySeason });
   $('stAnnual').innerHTML = `<h2>年間集計 ${esc(season.cycle)}</h2>` + table(annual);
 }
@@ -396,6 +412,36 @@ async function addDivision() {
   if (error) { gmsg(false, '追加に失敗: ' + error.message); return; }
   $('newDivName').value = '';
   gmsg(true, 'Divisionを追加しました');
+  await reloadAll();
+}
+async function addRule() {
+  const kind = $('nrKind').value;
+  const category = $('nrCategory').value.trim();
+  const label = $('nrLabel').value.trim();
+  const unit = $('nrUnit').value.trim() || '回';
+  const isVar = $('nrVariable').checked;
+  if (!category) { flash($('nrMsg'), false, '対象指標を入力してください'); return; }
+  if (!label) { flash($('nrMsg'), false, '内容を入力してください'); return; }
+  const payload = { kind, category, label, unit, is_variable: isVar };
+  if (isVar) {
+    payload.points = null;
+  } else {
+    const pts = parseInt($('nrPoints').value, 10);
+    if (!Number.isInteger(pts) || pts === 0) { flash($('nrMsg'), false, '固定ポイントは0以外の整数で入力してください'); return; }
+    if (kind === 'add' && pts < 0) { flash($('nrMsg'), false, '加点項目のポイントは正の値で入力してください'); return; }
+    if (kind === 'deduct' && pts > 0) { flash($('nrMsg'), false, '減点項目のポイントは負の値で入力してください'); return; }
+    payload.points = pts;
+  }
+  payload.display_order = Math.max(0, ...state.rules.map(r => r.display_order || 0)) + 1;
+  const { error } = await sb.from('l1_rules').insert(payload);
+  if (error) {
+    const dup = /duplicate|unique/i.test(error.message);
+    flash($('nrMsg'), false, dup ? '同じ内容の判定基準が既に存在します' : '追加に失敗: ' + error.message);
+    return;
+  }
+  flash($('nrMsg'), true, '判定基準を追加しました');
+  $('nrCategory').value = ''; $('nrLabel').value = ''; $('nrPoints').value = ''; $('nrVariable').checked = false;
+  $('nrPointsWrap').classList.remove('hidden');
   await reloadAll();
 }
 async function saveRule(id) {
@@ -499,6 +545,8 @@ $('dcSubmit').addEventListener('click', directSubmit);
 $('evSeason').addEventListener('change', renderEvents);
 $('stSeason').addEventListener('change', renderStandings);
 $('newDivBtn').addEventListener('click', addDivision);
+$('nrBtn').addEventListener('click', addRule);
+$('nrVariable').addEventListener('change', () => $('nrPointsWrap').classList.toggle('hidden', $('nrVariable').checked));
 $('nsBtn').addEventListener('click', addSeason);
 $('newAdmBtn').addEventListener('click', addAdmin);
 

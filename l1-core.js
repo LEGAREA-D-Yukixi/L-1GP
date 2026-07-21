@@ -54,12 +54,14 @@ export function seasonForDate(seasons, todayISO) {
  * divisions: [{id, name, display_order, is_active}]
  * 戻り値: pointsの降順・同点は同順位（1,1,3方式）
  */
-export function calcStandings({ season, divisions, events }) {
-  const base = season && Number.isFinite(Number(season.initial_points))
+export function calcStandings({ season, divisions, events, baseByDivision = null }) {
+  const seasonBase = season && Number.isFinite(Number(season.initial_points))
     ? Number(season.initial_points) : 1000;
   const totals = new Map();
   for (const d of divisions || []) {
     if (d.is_active === false) continue;
+    // baseByDivision が渡された場合は Division ごとの持ち越し基点を採用（通期での持ち越し）
+    const base = baseByDivision && baseByDivision.has(d.id) ? Number(baseByDivision.get(d.id)) : seasonBase;
     totals.set(d.id, { division_id: d.id, name: d.name, display_order: d.display_order ?? 0, points: base, event_count: 0 });
   }
   for (const e of events || []) {
@@ -80,35 +82,64 @@ export function calcStandings({ season, divisions, events }) {
   return rows;
 }
 
+/** eventsBySeason（Map or plain object）から season_id のイベント配列を取り出す */
+function eventsOf(eventsBySeason, sid) {
+  return (eventsBySeason instanceof Map ? eventsBySeason.get(sid) : (eventsBySeason || {})[sid]) || [];
+}
+
 /**
- * 年間集計: 同一cycleの全シーズン最終ポイントの合算（前半戦最終pt + 後半戦最終pt）。
- * eventsBySeason: Map<season_id, events[]> または {season_id: events[]}
+ * 持ち越し集計。
+ * season.carryover_from が設定されていれば、そのシーズンの最終ポイントを
+ * Division ごとの基点として引き継ぎ、当該シーズンのイベントを積み上げる（通期でポイントを保持）。
+ * carryover_from が null の場合は初期ポイント（1,000L）からスタート。
+ * 連鎖（前半戦 → 後半戦 → …）を root からたどって累積する。
+ */
+export function calcStandingsCarry({ season, seasons, divisions, eventsBySeason }) {
+  if (!season) return calcStandings({ season, divisions, events: [] });
+  const byId = new Map((seasons || []).map(s => [s.id, s]));
+
+  // root → … → season の連鎖を作る（循環・過剰深度はガード）
+  const chain = [];
+  const guard = new Set();
+  let cur = season, depth = 0;
+  while (cur && !guard.has(cur.id) && depth < 50) {
+    chain.unshift(cur);
+    guard.add(cur.id);
+    cur = cur.carryover_from ? byId.get(cur.carryover_from) : null;
+    depth++;
+  }
+
+  let baseByDivision = null;
+  let rows = [];
+  for (const s of chain) {
+    rows = calcStandings({ season: s, divisions, events: eventsOf(eventsBySeason, s.id), baseByDivision });
+    baseByDivision = new Map(rows.map(r => [r.division_id, r.points]));
+  }
+  return rows;
+}
+
+/**
+ * 年間集計（通期）。
+ * ポイントは半期リセットせず通期で持ち越すため、年間 = そのサイクルの
+ * 「終端シーズン（他シーズンから持ち越されない末端）」の持ち越し累積ポイント。
+ * = 初期1,000L + サイクル内の全イベント。
  */
 export function calcAnnualStandings({ cycle, seasons, divisions, eventsBySeason }) {
-  const target = (seasons || []).filter(s => s.cycle === cycle);
-  const totals = new Map();
-  for (const d of divisions || []) {
-    if (d.is_active === false) continue;
-    totals.set(d.id, { division_id: d.id, name: d.name, display_order: d.display_order ?? 0, points: 0, seasons: target.length });
+  const cyc = (seasons || []).filter(s => s.cycle === cycle);
+  const referenced = new Set(cyc.map(s => s.carryover_from).filter(Boolean));
+  let terminals = cyc.filter(s => !referenced.has(s.id));
+  if (terminals.length === 0) terminals = cyc; // フォールバック
+  const terminal = terminals.slice().sort((a, b) => (a.ends_on < b.ends_on ? 1 : -1))[0];
+
+  if (!terminal) {
+    // 対象サイクルにシーズンがない場合は全Division 0
+    const rows = (divisions || []).filter(d => d.is_active !== false)
+      .map(d => ({ division_id: d.id, name: d.name, display_order: d.display_order ?? 0, points: 0 }))
+      .sort((a, b) => a.display_order - b.display_order);
+    rows.forEach((r, i) => { r.rank = i + 1; });
+    return rows;
   }
-  const getEvents = sid =>
-    (eventsBySeason instanceof Map ? eventsBySeason.get(sid) : (eventsBySeason || {})[sid]) || [];
-  for (const s of target) {
-    const standings = calcStandings({ season: s, divisions, events: getEvents(s.id) });
-    for (const row of standings) {
-      const t = totals.get(row.division_id);
-      if (t) t.points += row.points;
-    }
-  }
-  const rows = [...totals.values()].sort(
-    (a, b) => b.points - a.points || a.display_order - b.display_order || String(a.name).localeCompare(String(b.name), 'ja')
-  );
-  let rank = 0, prev = null;
-  rows.forEach((r, i) => {
-    if (prev === null || r.points !== prev) { rank = i + 1; prev = r.points; }
-    r.rank = rank;
-  });
-  return rows;
+  return calcStandingsCarry({ season: terminal, seasons, divisions, eventsBySeason });
 }
 
 /** 年間タブを隠すべきか: 対象cycle内のいずれかのシーズンが現在ブラックアウト中ならtrue */
