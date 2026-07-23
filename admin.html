@@ -161,6 +161,8 @@
         <div><label>終了日</label><input id="nsEnd" type="date"></div>
         <div><label>初期ポイント</label><input id="nsInit" type="number" value="1000"></div>
       </div>
+      <label>初期ポイントの引き継ぎ元（前シーズンから引き継ぐ場合に選択）</label>
+      <select id="nsCarry"></select>
       <div style="margin-top:12px"><button class="btn" id="nsBtn">追加する</button></div>
       <div id="nsMsg" class="msg"></div>
     </section>
@@ -464,30 +466,54 @@ async function saveRule(id) {
 
 // ---------- シーズン ----------
 function renderSeasons() {
-  $('seasonBody').innerHTML = `<table><thead><tr><th>名称</th><th>サイクル</th><th>期間</th><th>初期pt</th><th>状態</th><th></th></tr></thead><tbody>` +
+  const carryOptions = (sid, current) =>
+    '<option value="">引き継がない（初期pt）</option>' +
+    state.seasons.filter(s => s.id !== sid).map(s =>
+      `<option value="${s.id}" ${s.id === current ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
+  $('seasonBody').innerHTML = `<table><thead><tr><th>名称</th><th>サイクル</th><th>引き継ぎ元</th><th>期間</th><th>初期pt</th><th>状態</th><th></th></tr></thead><tbody>` +
     state.seasons.map(s => `
       <tr>
-        <td><input value="${esc(s.name)}" id="sn-${s.id}" style="min-width:150px"></td>
-        <td><input value="${esc(s.cycle)}" id="sc-${s.id}" style="min-width:90px"></td>
-        <td class="muted">${esc(s.starts_on)} 〜 ${esc(s.ends_on)}</td>
+        <td><input value="${esc(s.name)}" id="sn-${s.id}" style="min-width:140px"></td>
+        <td><input value="${esc(s.cycle)}" id="sc-${s.id}" style="min-width:80px"></td>
+        <td><select id="sf-${s.id}" style="min-width:120px">${carryOptions(s.id, s.carryover_from)}</select></td>
+        <td class="muted">${esc(s.starts_on)}〜${esc(s.ends_on)}</td>
         <td>${s.initial_points}</td>
-        <td>${s.is_active ? '<span class="badge on">開催中</span>' : '<span class="badge">－</span>'}${s.carryover_from ? '<br><span class="muted">持越</span>' : ''}</td>
+        <td>${s.is_active ? '<span class="badge on">開催中</span>' : '<span class="badge">－</span>'}</td>
         <td style="white-space:nowrap">
           <button class="btn sm gray" data-saveseason="${s.id}">保存</button>
           ${s.is_active ? '' : `<button class="btn sm gray" data-activate="${s.id}">開催中にする</button>`}
+          ${s.is_active ? '' : `<button class="btn sm red" data-delseason="${s.id}">削除</button>`}
         </td>
       </tr>`).join('') + '</tbody></table>';
   $('seasonBody').querySelectorAll('[data-activate]').forEach(b => b.addEventListener('click', () => activateSeason(b.dataset.activate)));
   $('seasonBody').querySelectorAll('[data-saveseason]').forEach(b => b.addEventListener('click', () => saveSeason(b.dataset.saveseason)));
+  $('seasonBody').querySelectorAll('[data-delseason]').forEach(b => b.addEventListener('click', () => deleteSeason(b.dataset.delseason)));
+  // 新規追加フォームの引き継ぎ元セレクト
+  $('nsCarry').innerHTML = '<option value="">引き継がない（初期ポイントを使用）</option>' +
+    state.seasons.map(s => `<option value="${s.id}">${esc(s.name)} の最終ポイントを引き継ぐ</option>`).join('');
 }
 async function saveSeason(id) {
   const name = $(`sn-${id}`).value.trim();
   const cycle = $(`sc-${id}`).value.trim();
+  const carry = $(`sf-${id}`).value || null;
   if (!name) { gmsg(false, 'シーズン名は必須です'); return; }
   if (!cycle) { gmsg(false, '年間サイクルは必須です'); return; }
-  const { error } = await sb.from('l1_seasons').update({ name, cycle }).eq('id', id);
+  if (carry === id) { gmsg(false, '自分自身は引き継ぎ元にできません'); return; }
+  const { error } = await sb.from('l1_seasons').update({ name, cycle, carryover_from: carry }).eq('id', id);
   if (error) { gmsg(false, '保存に失敗: ' + error.message); return; }
   gmsg(true, 'シーズンを保存しました');
+  await reloadAll();
+}
+async function deleteSeason(id) {
+  const s = state.seasons.find(x => x.id === id);
+  if (!confirm(`シーズン「${s?.name ?? ''}」を削除します。よろしいですか？`)) return;
+  const { error } = await sb.from('l1_seasons').delete().eq('id', id);
+  if (error) {
+    const m = /開催中|イベント|持ち越し/.test(error.message) ? error.message.replace(/^.*L1: /, '') : error.message;
+    gmsg(false, '削除できません: ' + m);
+    return;
+  }
+  gmsg(true, 'シーズンを削除しました');
   await reloadAll();
 }
 async function activateSeason(id) {
@@ -509,9 +535,10 @@ async function addSeason() {
   if (!name || !cycle || !starts_on || !ends_on) { flash($('nsMsg'), false, '全項目を入力してください'); return; }
   if (!(ends_on > starts_on)) { flash($('nsMsg'), false, '終了日は開始日より後にしてください'); return; }
   if (!Number.isInteger(initial_points) || initial_points < 0) { flash($('nsMsg'), false, '初期ポイントが不正です'); return; }
-  const { error } = await sb.from('l1_seasons').insert({ name, cycle, starts_on, ends_on, initial_points, is_active: false });
+  const carry = $('nsCarry').value || null;
+  const { error } = await sb.from('l1_seasons').insert({ name, cycle, starts_on, ends_on, initial_points, is_active: false, carryover_from: carry });
   if (error) { flash($('nsMsg'), false, '追加に失敗: ' + error.message); return; }
-  flash($('nsMsg'), true, 'シーズンを追加しました（開催中への切替は一覧から）');
+  flash($('nsMsg'), true, carry ? 'シーズンを追加しました（前シーズンからポイントを引き継ぎます）' : 'シーズンを追加しました（開催中への切替は一覧から）');
   $('nsName').value = ''; $('nsCycle').value = '';
   await reloadAll();
 }

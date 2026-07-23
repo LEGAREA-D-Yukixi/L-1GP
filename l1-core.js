@@ -198,20 +198,21 @@ export function seasonBaseline({ season, seasons }) {
   return cur && Number.isFinite(Number(cur.initial_points)) ? Number(cur.initial_points) : 1000;
 }
 
-/** 順位表の基準線からの最大乖離（バーのスケール用。最低100Lは確保） */
-export function maxAbsDeviation(rows, baseline = 1000) {
-  return Math.max(100, ...(rows || []).map(r => Math.abs((Number(r.points) || 0) - baseline)));
-}
-
 /**
- * 基準線バーの形状。1,000Lを中央として、上回れば右（プラス側）、下回れば左（マイナス側）へ伸ばす。
- * 戻り値: { side:'up'|'down'|'zero', dev, pct } — pctは中央からの伸び幅(0-100)
+ * 基準線ゲージ（左端 = 0L、中央 = baseline(1,000L)、右端 = 2×baseline）。
+ * 左端から points の位置まで1本のバーで満たす。
+ * 戻り値: { fillPct, centerPct, dev, side, over }
+ *   fillPct : 左端からの塗り幅(0-100)
+ *   centerPct: 基準線(1,000L)の位置(通常50)
+ *   side    : 基準線に対して 'up'（上回る）/'down'（下回る）/'zero'
  */
-export function pointsBar({ points, baseline = 1000, maxAbs = 100 }) {
-  const dev = (Number(points) || 0) - baseline;
-  const scale = Math.max(1, Number(maxAbs) || 0);
-  const pct = Math.min(100, Math.round((Math.abs(dev) / scale) * 100));
-  return { side: dev > 0 ? 'up' : dev < 0 ? 'down' : 'zero', dev, pct };
+export function pointsBar({ points, baseline = 1000 }) {
+  const max = Math.max(1, baseline * 2);
+  const p = Number(points) || 0;
+  const fillPct = Math.max(0, Math.min(100, (p / max) * 100));
+  const centerPct = Math.max(0, Math.min(100, (baseline / max) * 100));
+  const dev = p - baseline;
+  return { fillPct, centerPct, dev, side: dev > 0 ? 'up' : dev < 0 ? 'down' : 'zero', over: p > max };
 }
 
 /** 逆ピラミッド用: 順位に応じたカード幅(%)。1位が最も広く、順位が下がるほど狭くなる */

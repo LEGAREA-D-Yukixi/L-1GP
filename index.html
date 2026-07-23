@@ -7,189 +7,178 @@
 <title>L-1グランプリ | Division対抗ポイントバトル</title>
 <style>
   :root {
-    --navy0: #050b1c; --navy1: #0a1636; --navy2: #0f2050; --panel: #0c1b40;
-    --line: #1f57b0; --line-soft: #17356e;
-    --cyan: #35c8ff; --cyan-soft: #7fe0ff; --gold: #ffc627; --gold-soft: #ffe27a;
-    --text: #eaf2ff; --muted: #93aad6;
-    --add: #38e08a; --deduct: #ff5470; --danger: #ffd400;
+    --navy0:#03060f; --navy1:#071231; --navy2:#0c1c46; --panel:#0a1838; --panel2:#0f2452;
+    --line:#1f5ec0; --line-soft:#173a7e;
+    --cyan:#35c8ff; --cyan-soft:#8fe6ff; --gold:#ffc627; --gold-soft:#ffe27a;
+    --text:#eaf2ff; --muted:#9fb4dd;
+    --add:#3ce38c; --deduct:#ff556e; --danger:#ffe000;
   }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; }
   body {
-    font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
-    color: var(--text);
-    background:
-      radial-gradient(1200px 500px at 50% -120px, rgba(53,200,255,.18), transparent 60%),
-      linear-gradient(180deg, var(--navy1) 0%, var(--navy0) 100%);
-    background-attachment: fixed;
-    min-height: 100vh;
+    font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,sans-serif; color:var(--text);
+    background:var(--navy0); min-height:100vh;
   }
-  /* 回路っぽいうっすらグリッド */
+  /* ===== ポスター調 背景（濃紺＋回路＋グロー） ===== */
   body::before {
-    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .35; z-index: 0;
-    background-image:
-      linear-gradient(rgba(53,200,255,.06) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(53,200,255,.06) 1px, transparent 1px);
-    background-size: 44px 44px;
-    mask-image: radial-gradient(circle at 50% 20%, #000 0%, transparent 75%);
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(900px 420px at 50% -80px, rgba(53,200,255,.22), transparent 60%),
+      radial-gradient(700px 500px at 12% 18%, rgba(31,94,192,.28), transparent 55%),
+      radial-gradient(700px 500px at 88% 30%, rgba(20,60,140,.25), transparent 55%),
+      linear-gradient(180deg, #071231 0%, #050c22 55%, #03060f 100%);
   }
-  .wrap { max-width: 940px; margin: 0 auto; padding: 18px 16px 90px; position: relative; z-index: 1; }
+  body::after {
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.5;
+    background-image:
+      linear-gradient(rgba(53,200,255,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(53,200,255,.07) 1px, transparent 1px),
+      radial-gradient(circle, rgba(120,210,255,.5) 1.3px, transparent 1.6px);
+    background-size:46px 46px, 46px 46px, 138px 138px;
+    background-position:0 0,0 0,20px 30px;
+    mask-image:radial-gradient(circle at 50% 22%, #000 0%, transparent 78%);
+  }
+  .wrap { max-width:940px; margin:0 auto; padding:14px 16px 90px; position:relative; z-index:1; }
 
   /* ===== ヘッダー ===== */
-  header { text-align: center; padding: 14px 0 6px; }
-  .kicker { color: var(--cyan-soft); letter-spacing: .12em; font-weight: 700; font-size: 13px; }
+  header { text-align:center; padding:10px 0 4px; }
+  .kicker { color:var(--cyan-soft); letter-spacing:.14em; font-weight:800; font-size:14px; text-shadow:0 0 10px rgba(53,200,255,.5); }
+  .logorow { display:flex; align-items:center; justify-content:center; gap:6px; margin:2px 0; }
   .logo {
-    font-size: clamp(34px, 9vw, 60px); font-weight: 900; line-height: 1; margin: 6px 0 4px;
-    font-style: italic; letter-spacing: .01em;
-    background: linear-gradient(180deg, #fff 8%, var(--gold-soft) 45%, var(--gold) 78%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    filter: drop-shadow(0 3px 10px rgba(255,198,39,.45)) drop-shadow(0 0 2px rgba(0,0,0,.6));
+    font-size:clamp(36px,9.5vw,62px); font-weight:900; line-height:1; font-style:italic; letter-spacing:.01em;
+    background:linear-gradient(180deg,#fff 6%,var(--gold-soft) 42%,var(--gold) 76%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 3px 10px rgba(255,198,39,.5)) drop-shadow(0 0 2px rgba(0,0,0,.7));
   }
-  .logo .cup { -webkit-text-fill-color: initial; }
+  .logo-trophy { height:clamp(52px,13vw,86px); filter:drop-shadow(0 4px 14px rgba(255,198,39,.55)); margin:0 -2px; }
   .tagline {
-    display: inline-block; margin-top: 6px; padding: 6px 18px; font-weight: 800; font-size: 14px;
-    color: #06122e; background: linear-gradient(90deg, var(--cyan), var(--cyan-soft));
-    border-radius: 4px; clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+    display:inline-block; margin-top:6px; padding:6px 20px; font-weight:800; font-size:14px; color:#06122e;
+    background:linear-gradient(90deg,var(--cyan),var(--cyan-soft)); border-radius:4px;
+    clip-path:polygon(7px 0,100% 0,calc(100% - 7px) 100%,0 100%); box-shadow:0 0 16px rgba(53,200,255,.4);
   }
 
-  /* ===== セクション見出し（▶▶ … ◀◀） ===== */
-  .banner {
-    display: flex; align-items: center; justify-content: center; gap: 12px;
-    margin: 26px 0 14px; color: var(--text); font-weight: 900; font-size: clamp(17px, 4.4vw, 22px);
-    text-shadow: 0 0 12px rgba(53,200,255,.5);
-  }
-  .banner .tri { color: var(--cyan); letter-spacing: -2px; font-size: 15px; opacity: .9; }
+  /* ===== 見出し（▶▶ … ◀◀） ===== */
+  .banner { display:flex; align-items:center; justify-content:center; gap:12px; margin:24px 0 12px;
+            font-weight:900; font-size:clamp(17px,4.4vw,22px); text-shadow:0 0 12px rgba(53,200,255,.55); }
+  .banner .tri { color:var(--cyan); letter-spacing:-2px; font-size:15px; }
 
-  .tabs { display: flex; gap: 8px; margin: 6px 0 4px; flex-wrap: wrap; justify-content: center; }
-  .tabs button {
-    background: rgba(12,27,64,.7); color: var(--cyan-soft); border: 1px solid var(--line-soft);
-    border-radius: 8px; padding: 9px 16px; cursor: pointer; font-size: 14px; font-weight: 700;
-    transition: .15s;
-  }
-  .tabs button:hover { border-color: var(--cyan); }
-  .tabs button.active {
-    background: linear-gradient(90deg, var(--cyan), #1b8fd6); color: #06122e; border-color: var(--cyan);
-    box-shadow: 0 0 16px rgba(53,200,255,.4);
-  }
+  .tabs { display:flex; gap:8px; margin:4px 0; flex-wrap:wrap; justify-content:center; }
+  .tabs button { background:rgba(10,24,56,.75); color:var(--cyan-soft); border:1px solid var(--line-soft);
+                 border-radius:8px; padding:9px 15px; cursor:pointer; font-size:14px; font-weight:700; transition:.15s; }
+  .tabs button:hover { border-color:var(--cyan); }
+  .tabs button.active { background:linear-gradient(90deg,var(--cyan),#1b8fd6); color:#06122e; border-color:var(--cyan); box-shadow:0 0 16px rgba(53,200,255,.4); }
 
-  .card {
-    background: linear-gradient(180deg, rgba(15,32,80,.92), rgba(9,22,54,.92));
-    border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px;
-    box-shadow: inset 0 0 0 1px rgba(53,200,255,.06), 0 8px 30px rgba(0,0,0,.35);
-  }
-  .card h2 { font-size: 15px; margin: 0 0 12px; color: var(--cyan-soft); }
+  .card { background:linear-gradient(180deg,rgba(12,28,66,.94),rgba(8,20,48,.94)); border:1px solid var(--line);
+          border-radius:14px; padding:16px; margin-bottom:16px; box-shadow:inset 0 0 0 1px rgba(53,200,255,.06),0 8px 30px rgba(0,0,0,.4); }
+  .card h2 { font-size:15px; margin:0 0 12px; color:var(--cyan-soft); }
 
-  select, input, textarea {
-    width: 100%; background: #071230; color: var(--text); border: 1px solid var(--line-soft);
-    border-radius: 8px; padding: 10px 11px; font-size: 14px;
-  }
-  select:focus, input:focus, textarea:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(53,200,255,.18); }
-  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
-  .btn {
-    background: linear-gradient(90deg, var(--gold), var(--gold-soft)); color: #2a1c00; border: none;
-    border-radius: 8px; padding: 11px 20px; font-size: 14px; font-weight: 800; cursor: pointer;
-    box-shadow: 0 4px 16px rgba(255,198,39,.3); margin-top: 14px;
-  }
-  .btn:disabled { opacity: .5; cursor: default; }
+  select,input,textarea { width:100%; background:#061031; color:var(--text); border:1px solid var(--line-soft);
+                          border-radius:8px; padding:10px 11px; font-size:14px; }
+  select:focus,input:focus,textarea:focus { outline:none; border-color:var(--cyan); box-shadow:0 0 0 3px rgba(53,200,255,.18); }
+  label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
+  .btn { background:linear-gradient(90deg,var(--gold),var(--gold-soft)); color:#2a1c00; border:none; border-radius:8px;
+         padding:11px 20px; font-size:14px; font-weight:800; cursor:pointer; box-shadow:0 4px 16px rgba(255,198,39,.3); margin-top:14px; }
+  .btn:disabled { opacity:.5; cursor:default; }
 
   /* ===== 順位（逆ピラミッド） ===== */
-  #podium { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-  .prow {
-    position: relative; margin: 0 auto; width: 100%;
-    background: linear-gradient(180deg, rgba(20,42,96,.9), rgba(11,26,62,.9));
-    border: 1px solid var(--line-soft); border-radius: 12px; padding: 11px 14px;
-    display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 12px;
-    transition: width .25s ease;
-  }
-  .prow .rk { font-weight: 900; font-size: 20px; text-align: center; color: var(--cyan-soft); }
-  .prow .nm { font-weight: 800; font-size: 15px; }
-  .prow .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .prow .val { text-align: right; white-space: nowrap; }
-  .prow .val .pt { font-weight: 900; font-size: 18px; }
-  .prow .val .dev { font-size: 11px; font-weight: 800; }
+  #podium { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .prow { position:relative; margin:0 auto; width:100%;
+          background:linear-gradient(180deg,rgba(18,40,92,.92),rgba(9,22,54,.92)); border:1px solid var(--line-soft);
+          border-radius:12px; padding:11px 14px; display:grid; grid-template-columns:54px 1fr auto; align-items:center; gap:12px; transition:width .25s ease; }
+  .prow .rk { font-weight:900; font-size:19px; text-align:center; color:var(--cyan-soft); }
+  .prow .icon { width:26px; height:26px; object-fit:contain; vertical-align:middle; margin-right:6px; }
+  .prow .nm { font-weight:800; font-size:15px; display:flex; align-items:center; flex-wrap:wrap; }
+  .prow .sub { font-size:11px; color:var(--muted); margin-top:2px; }
+  .prow .val { text-align:right; white-space:nowrap; }
+  .prow .val .pt { font-weight:900; font-size:18px; }
+  .prow .val .dev { font-size:11px; font-weight:800; }
 
-  /* 基準線バー（1,000Lが中央） */
-  .gauge { grid-column: 1 / -1; margin-top: 9px; position: relative; height: 16px;
-           background: rgba(3,10,28,.8); border-radius: 8px; overflow: hidden; border: 1px solid var(--line-soft); }
-  .gauge .mid { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px; transform: translateX(-1px);
-                background: rgba(255,255,255,.55); box-shadow: 0 0 6px rgba(255,255,255,.5); z-index: 2; }
-  .gauge .fill { position: absolute; top: 0; bottom: 0; }
-  .gauge .fill.up   { left: 50%; background: linear-gradient(90deg, rgba(56,224,138,.35), var(--add)); border-radius: 0 8px 8px 0; }
-  .gauge .fill.down { right: 50%; background: linear-gradient(270deg, rgba(255,84,112,.35), var(--deduct)); border-radius: 8px 0 0 8px; }
-  .gauge .baselabel { position: absolute; left: 50%; transform: translateX(-50%); top: 1px; font-size: 9px; color: rgba(255,255,255,.6); z-index: 3; font-weight: 700; }
+  /* 基準線ゲージ: 左端0・中央1,000・右端2,000 の1本塗り */
+  .gauge { grid-column:1/-1; margin-top:9px; position:relative; height:18px; background:rgba(2,8,24,.85);
+           border-radius:9px; overflow:hidden; border:1px solid var(--line-soft); }
+  .gauge .fill { position:absolute; left:0; top:0; bottom:0; border-radius:9px 0 0 9px; }
+  .gauge .fill.up   { background:linear-gradient(90deg,rgba(56,224,138,.4),var(--add)); }
+  .gauge .fill.down { background:linear-gradient(90deg,rgba(255,85,110,.4),var(--deduct)); }
+  .gauge .center { position:absolute; top:-2px; bottom:-2px; width:2px; background:rgba(255,255,255,.7);
+                   box-shadow:0 0 6px rgba(255,255,255,.6); z-index:3; }
+  .gauge .lbl0 { position:absolute; left:4px; top:2px; font-size:9px; color:rgba(255,255,255,.55); z-index:4; font-weight:700; }
+  .gauge .lblc { position:absolute; top:2px; transform:translateX(-50%); font-size:9px; color:rgba(255,255,255,.85); z-index:4; font-weight:800; }
 
-  /* 1位 = 王者（金・トロフィー・グロー） */
-  .prow.champ {
-    border: 2px solid var(--gold);
-    background: linear-gradient(180deg, rgba(80,58,10,.55), rgba(30,26,10,.7));
-    box-shadow: 0 0 26px rgba(255,198,39,.45), inset 0 0 24px rgba(255,198,39,.12);
-    padding: 16px 16px 14px;
-  }
-  .prow.champ .rk { color: var(--gold); font-size: 15px; }
-  .prow.champ .crown { font-size: 30px; line-height: 1; }
-  .prow.champ .nm { font-size: 20px; color: var(--gold-soft); text-shadow: 0 0 14px rgba(255,198,39,.5); }
-  .prow.champ .val .pt { font-size: 24px; color: var(--gold-soft); }
-  .champ-tag {
-    display: inline-block; font-size: 10px; font-weight: 900; color: #2a1c00; background: var(--gold);
-    padding: 1px 8px; border-radius: 10px; margin-left: 6px; vertical-align: middle;
-  }
+  /* 1位 = 王者 */
+  .prow.champ { border:2px solid var(--gold); background:linear-gradient(180deg,rgba(84,60,10,.55),rgba(28,24,10,.72));
+                box-shadow:0 0 26px rgba(255,198,39,.45),inset 0 0 24px rgba(255,198,39,.12); padding:16px 16px 14px; }
+  .prow.champ .rk { color:var(--gold); font-size:14px; }
+  .prow.champ .crown { font-size:28px; line-height:1; }
+  .prow.champ .nm { font-size:20px; color:var(--gold-soft); text-shadow:0 0 14px rgba(255,198,39,.5); }
+  .prow.champ .val .pt { font-size:24px; color:var(--gold-soft); }
+  .champ-tag { display:inline-block; font-size:10px; font-weight:900; color:#2a1c00; background:var(--gold); padding:1px 8px; border-radius:10px; margin-left:6px; }
 
-  /* 最下位 = 危険（黄枠・ドクロ・沈んだ赤） */
-  .prow.last {
-    border: 2px dashed var(--danger);
-    background: linear-gradient(180deg, rgba(78,14,26,.7), rgba(40,8,16,.8));
-    box-shadow: 0 0 18px rgba(255,212,0,.25);
-  }
-  .prow.last .rk { color: var(--danger); }
-  .prow.last .nm { color: #ffb3c0; }
-  .prow.last .skull { font-size: 20px; }
-  .last-tag {
-    display: inline-block; font-size: 10px; font-weight: 900; color: #2a0008; background: var(--danger);
-    padding: 1px 8px; border-radius: 10px; margin-left: 6px; vertical-align: middle;
-  }
-  .last-note { text-align: center; color: var(--danger); font-size: 12px; font-weight: 700; margin-top: 4px; }
+  /* 最下位 = 危険 */
+  .prow.last { border:2px dashed var(--danger); background:linear-gradient(180deg,rgba(80,14,26,.72),rgba(40,8,16,.82)); box-shadow:0 0 18px rgba(255,224,0,.25); }
+  .prow.last .rk { color:var(--danger); }
+  .prow.last .nm { color:#ffb3c0; }
+  .prow.last .skull { font-size:19px; }
+  .last-tag { display:inline-block; font-size:10px; font-weight:900; color:#2a0008; background:var(--danger); padding:1px 8px; border-radius:10px; margin-left:6px; }
+  .last-note { text-align:center; color:var(--danger); font-size:12px; font-weight:700; margin-top:6px; }
+
+  /* ===== 判定基準（ポスター準拠テーブル） ===== */
+  .critwrap { display:grid; gap:16px; }
+  .crittbl { border-radius:12px; overflow:hidden; border:1px solid var(--line-soft); }
+  .crittbl.deduct { border-color:rgba(53,200,255,.5); }
+  .crittbl.add { border-color:rgba(255,110,180,.5); }
+  .crithead { display:flex; align-items:center; gap:10px; padding:10px 14px; font-weight:900; font-size:15px; }
+  .crittbl.deduct .crithead { background:linear-gradient(90deg,rgba(53,200,255,.28),transparent); color:var(--cyan-soft); }
+  .crittbl.add .crithead { background:linear-gradient(90deg,rgba(255,110,180,.28),transparent); color:#ff9ecb; }
+  .critrow { display:grid; grid-template-columns:44px 1fr auto; align-items:center; gap:10px; padding:9px 12px; border-top:1px solid rgba(53,200,255,.12); font-size:13px; }
+  .critrow .ci { width:30px; height:30px; object-fit:contain; }
+  .critrow .clabel { font-weight:700; }
+  .critrow .cdesc { color:var(--muted); font-size:11px; margin-top:1px; }
+  .critrow .cpt { font-weight:900; white-space:nowrap; }
+  .critrow .cpt.add { color:var(--add); }
+  .critrow .cpt.deduct { color:var(--deduct); }
 
   /* ===== フィード ===== */
-  .feeditem { display: flex; justify-content: space-between; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--line-soft); font-size: 13px; }
-  .feeditem:last-child { border-bottom: none; }
-  .feeditem .left { min-width: 0; }
-  .feeditem .date { color: var(--muted); margin-right: 8px; font-variant-numeric: tabular-nums; }
-  .add { color: var(--add); font-weight: 800; }
-  .deduct { color: var(--deduct); font-weight: 800; }
-  .muted { color: var(--muted); font-size: 12px; }
+  .feeditem { display:flex; justify-content:space-between; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line-soft); font-size:13px; align-items:center; }
+  .feeditem:last-child { border-bottom:none; }
+  .feeditem .left { min-width:0; display:flex; align-items:center; gap:8px; }
+  .feeditem .fi { width:22px; height:22px; object-fit:contain; flex:0 0 auto; }
+  .feeditem .date { color:var(--muted); margin-right:6px; font-variant-numeric:tabular-nums; }
+  .add { color:var(--add); font-weight:800; }
+  .deduct { color:var(--deduct); font-weight:800; }
+  .muted { color:var(--muted); font-size:12px; }
 
-  .blackout { text-align: center; padding: 30px 12px; }
-  .blackout .big { font-size: 21px; font-weight: 900; margin-bottom: 8px; color: var(--gold-soft); text-shadow: 0 0 16px rgba(255,198,39,.4); }
-  .blackout p { color: var(--muted); font-size: 14px; margin: 4px 0; }
+  .blackout { text-align:center; padding:30px 12px; }
+  .blackout .big { font-size:21px; font-weight:900; margin-bottom:8px; color:var(--gold-soft); text-shadow:0 0 16px rgba(255,198,39,.4); }
+  .blackout p { color:var(--muted); font-size:14px; margin:4px 0; }
 
-  .msg { border-radius: 8px; padding: 11px 13px; font-size: 13px; margin-top: 12px; display: none; }
-  .msg.okmsg { background: rgba(56,224,138,.12); color: var(--add); display: block; border: 1px solid rgba(56,224,138,.3); }
-  .msg.ngmsg { background: rgba(255,84,112,.12); color: var(--deduct); display: block; white-space: pre-wrap; border: 1px solid rgba(255,84,112,.3); }
-  .hidden { display: none !important; }
-  #loading { color: var(--muted); padding: 26px; text-align: center; }
+  .msg { border-radius:8px; padding:11px 13px; font-size:13px; margin-top:12px; display:none; }
+  .msg.okmsg { background:rgba(56,224,138,.12); color:var(--add); display:block; border:1px solid rgba(56,224,138,.3); }
+  .msg.ngmsg { background:rgba(255,85,110,.12); color:var(--deduct); display:block; white-space:pre-wrap; border:1px solid rgba(255,85,110,.3); }
+  .hidden { display:none !important; }
+  #loading { color:var(--muted); padding:26px; text-align:center; }
 
-  /* 下部スカイライン */
-  footer.sky {
-    position: fixed; left: 0; right: 0; bottom: 0; height: 70px; z-index: 0; pointer-events: none;
-    background:
-      linear-gradient(180deg, transparent, rgba(5,11,28,.9)),
-      repeating-linear-gradient(90deg, rgba(31,87,176,.25) 0 14px, transparent 14px 30px);
-    mask-image: linear-gradient(180deg, transparent, #000 60%);
-  }
-  .foot-note { text-align: center; color: var(--muted); font-size: 11px; margin-top: 18px; }
+  footer.sky { position:fixed; left:0; right:0; bottom:0; height:72px; z-index:0; pointer-events:none;
+    background:linear-gradient(180deg,transparent,rgba(3,6,15,.92)),repeating-linear-gradient(90deg,rgba(31,94,192,.28) 0 14px,transparent 14px 30px);
+    mask-image:linear-gradient(180deg,transparent,#000 60%); }
+  .foot-note { text-align:center; color:var(--muted); font-size:11px; margin-top:18px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div class="kicker">Division 対抗ポイントバトル！</div>
-    <div class="logo">L-1<span class="cup">🏆</span>グランプリ</div>
+    <div class="logorow">
+      <span class="logo">L-1</span>
+      <img class="logo-trophy" src="./icons/trophy.png" alt="トロフィー">
+      <span class="logo">グランプリ</span>
+    </div>
     <div class="tagline">全員の力で優勝を勝ち取れ！</div>
   </header>
 
   <div class="tabs">
     <button id="tabSeason" class="active">順位</button>
     <button id="tabAnnual">年間集計</button>
+    <button id="tabCriteria">判定基準</button>
     <button id="tabApply">ポイント申請</button>
   </div>
 
@@ -217,6 +206,12 @@
     <div id="annualBody"></div>
   </section>
 
+  <!-- 判定基準 -->
+  <section id="secCriteria" class="hidden">
+    <div class="banner"><span class="tri">▶▶▶</span>ポイント判定基準<span class="tri">◀◀◀</span></div>
+    <div class="critwrap" id="criteriaBody"></div>
+  </section>
+
   <!-- 申請 -->
   <section id="secApply" class="hidden">
     <div class="banner"><span class="tri">▶▶</span>ポイント申請<span class="tri">◀◀</span></div>
@@ -226,6 +221,7 @@
       <select id="apDivision"></select>
       <label for="apRule">項目</label>
       <select id="apRule"></select>
+      <div id="apPreview" class="hidden" style="margin-top:10px"></div>
       <div id="apPointsWrap" class="hidden">
         <label for="apPoints">ポイント（不定期missionのみ入力・加点は正の整数）</label>
         <input id="apPoints" type="number" step="1" placeholder="例: 300">
@@ -250,8 +246,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import {
   isBlackout, isAnnualBlackout, seasonForDate, calcStandingsCarry, calcAnnualStandings,
-  validateRequestInput, groupRules, buildFeed, formatPoints,
-  seasonBaseline, maxAbsDeviation, pointsBar, pyramidWidth,
+  validateRequestInput, groupRules, buildFeed, formatPoints, seasonBaseline, pointsBar, pyramidWidth,
 } from './l1-core.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -259,59 +254,67 @@ const $ = id => document.getElementById(id);
 const todayISO = () => new Date().toLocaleDateString('sv-SE');
 const EVENT_COLS = 'id, season_id, division_id, rule_id, points, occurred_on, request_id, created_at, voided_at';
 
-let state = { divisions: [], seasons: [], rules: [], events: [], selectedSeasonId: null };
-
-function esc(s) {
-  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// 判定基準カテゴリ → ポスター切り出しアイコン
+const ICON_MAP = {
+  '稼働安定':'deduct_1','待機':'deduct_2','チーム定着':'deduct_3','セキュリティ':'deduct_4',
+  '勤怠管理':'deduct_5','備品管理':'deduct_6','申告漏れ':'deduct_7','ルール遵守':'deduct_8','ルール厳守':'deduct_8',
+  '採用受入':'add_1','イノベーション':'add_2','スキルアップ':'add_3','マルチ案件獲得':'add_4',
+  'マルチ案件継続':'add_5','リファラル採用':'add_6','面談代打':'add_7','不定期mission':'add_8',
+};
+const iconFile = cat => ICON_MAP[cat] ? `./icons/${ICON_MAP[cat]}.png` : null;
+function iconImg(cat, cls) {
+  const f = iconFile(cat);
+  return f ? `<img class="${cls}" src="${f}" alt="" onerror="this.style.display='none'">` : '';
 }
-function showErr(msg) { const b = $('errBox'); b.className = 'msg ngmsg'; b.textContent = msg; }
+
+let state = { divisions: [], seasons: [], rules: [], events: [], selectedSeasonId: null };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+function showErr(msg) { const b=$('errBox'); b.className='msg ngmsg'; b.textContent=msg; }
 
 async function loadAll() {
   const [dv, ss, rl, ev] = await Promise.all([
     sb.from('l1_divisions').select('*').order('display_order'),
     sb.from('l1_seasons').select('*').order('starts_on'),
     sb.from('l1_rules').select('*').order('display_order'),
-    sb.from('l1_events').select(EVENT_COLS).order('occurred_on', { ascending: false }).limit(2000),
+    sb.from('l1_events').select(EVENT_COLS).order('occurred_on', { ascending:false }).limit(2000),
   ]);
   for (const r of [dv, ss, rl, ev]) if (r.error) throw r.error;
-  state.divisions = dv.data; state.seasons = ss.data; state.rules = rl.data; state.events = ev.data;
+  state.divisions=dv.data; state.seasons=ss.data; state.rules=rl.data; state.events=ev.data;
   const active = state.seasons.find(s => s.is_active) || seasonForDate(state.seasons, todayISO());
   state.selectedSeasonId = active ? active.id : (state.seasons.at(-1)?.id ?? null);
 }
 
 function renderSeasonSelect() {
   $('seasonSel').innerHTML = state.seasons.map(s =>
-    `<option value="${s.id}" ${s.id === state.selectedSeasonId ? 'selected' : ''}>${esc(s.name)}${s.is_active ? '（開催中）' : ''}</option>`
-  ).join('');
+    `<option value="${s.id}" ${s.id === state.selectedSeasonId ? 'selected' : ''}>${esc(s.name)}${s.is_active ? '（開催中）' : ''}</option>`).join('');
 }
 
-/** 逆ピラミッド + 基準線バーで順位を描画 */
+/** 逆ピラミッド + 基準線ゲージ（左端0・中央1,000） */
 function renderPyramid(container, rows, baseline) {
   const total = rows.length;
-  const maxAbs = maxAbsDeviation(rows, baseline);
   container.innerHTML = '<div id="podium"></div>';
   const podium = container.querySelector('#podium');
   rows.forEach(r => {
     const isChamp = r.rank === 1;
     const isLast = r.rank === total && total > 1;
     const width = pyramidWidth(r.rank, total);
-    const bar = pointsBar({ points: r.points, baseline, maxAbs });
+    const bar = pointsBar({ points:r.points, baseline });
     const devLabel = bar.dev === 0 ? '±0' : (bar.dev > 0 ? `+${bar.dev}` : `${bar.dev}`);
     const devClass = bar.dev > 0 ? 'add' : bar.dev < 0 ? 'deduct' : 'muted';
-
     const el = document.createElement('div');
     el.className = 'prow' + (isChamp ? ' champ' : '') + (isLast ? ' last' : '');
     el.style.width = width + '%';
     el.innerHTML = `
       <div class="rk">${isChamp ? '<div class="crown">👑</div>' : ''}${isLast ? '<span class="skull">☠</span>' : ''}<div>${r.rank}位</div></div>
       <div class="nm">${esc(r.name)}${isChamp ? '<span class="champ-tag">王者</span>' : ''}${isLast ? '<span class="last-tag">最下位</span>' : ''}
-        <div class="sub">基準1,000Lから ${devLabel}L</div></div>
+        <span class="sub" style="width:100%">基準1,000Lから ${devLabel}L</span></div>
       <div class="val"><div class="pt">${r.points.toLocaleString()}<span style="font-size:12px"> L</span></div>
         <div class="dev ${devClass}">${devLabel} L</div></div>
       <div class="gauge">
-        <span class="baselabel">1,000</span>
-        <div class="mid"></div>
-        ${bar.side !== 'zero' ? `<div class="fill ${bar.side}" style="width:${bar.pct / 2}%"></div>` : ''}
+        <div class="fill ${bar.side === 'down' ? 'down' : 'up'}" style="width:${bar.fillPct}%"></div>
+        <div class="center" style="left:${bar.centerPct}%"></div>
+        <span class="lbl0">0</span>
+        <span class="lblc" style="left:${bar.centerPct}%">1,000</span>
       </div>`;
     podium.appendChild(el);
   });
@@ -327,8 +330,8 @@ function renderStandings() {
   const season = state.seasons.find(s => s.id === state.selectedSeasonId);
   if (!season) { $('standingsBody').innerHTML = '<div class="card muted">シーズンがありません</div>'; return; }
   const eventsBySeason = new Map(state.seasons.map(s => [s.id, state.events.filter(e => e.season_id === s.id)]));
-  const rows = calcStandingsCarry({ season, seasons: state.seasons, divisions: state.divisions, eventsBySeason });
-  const baseline = seasonBaseline({ season, seasons: state.seasons });
+  const rows = calcStandingsCarry({ season, seasons:state.seasons, divisions:state.divisions, eventsBySeason });
+  const baseline = seasonBaseline({ season, seasons:state.seasons });
   const blackout = isBlackout(season, todayISO());
   const carried = !!season.carryover_from;
   $('standingsTitle').textContent = `${season.name}${carried ? '（持ち越し）' : ''}`;
@@ -345,12 +348,12 @@ function renderStandings() {
   }
 
   const seasonEvents = state.events.filter(e => e.season_id === season.id);
-  const feed = buildFeed({ events: seasonEvents, divisions: state.divisions, rules: state.rules, limit: 60 });
+  const feed = buildFeed({ events:seasonEvents, divisions:state.divisions, rules:state.rules, limit:60 });
   $('feedBody').innerHTML = feed.length === 0
     ? '<div class="muted" style="padding:12px 0">まだ記録がありません。</div>'
     : feed.map(f => `
       <div class="feeditem">
-        <div class="left"><span class="date">${esc(f.occurred_on)}</span><b>${esc(f.division_name)}</b>　${esc(f.category)}<span class="muted">（${esc(f.label)}）</span></div>
+        <div class="left">${iconImg(f.category,'fi')}<span><span class="date">${esc(f.occurred_on)}</span><b>${esc(f.division_name)}</b>　${esc(f.category)}<span class="muted">（${esc(f.label)}）</span></span></div>
         <div class="${f.kind === 'add' ? 'add' : 'deduct'}">${esc(f.points_label)} L</div>
       </div>`).join('');
 }
@@ -360,7 +363,7 @@ function renderAnnual() {
   const cycle = season?.cycle;
   if (!cycle) { $('annualBody').innerHTML = '<div class="card muted">データがありません</div>'; return; }
   $('annualTitle').textContent = `年間集計 ${cycle}`;
-  if (isAnnualBlackout({ cycle, seasons: state.seasons }, todayISO())) {
+  if (isAnnualBlackout({ cycle, seasons:state.seasons }, todayISO())) {
     $('annualBody').innerHTML = `
       <div class="card blackout">
         <div class="big">🤫 年間王者は決起会で発表！</div>
@@ -369,14 +372,32 @@ function renderAnnual() {
     return;
   }
   const eventsBySeason = new Map(state.seasons.map(s => [s.id, state.events.filter(e => e.season_id === s.id)]));
-  const rows = calcAnnualStandings({ cycle, seasons: state.seasons, divisions: state.divisions, eventsBySeason });
-  const baseline = seasonBaseline({ season, seasons: state.seasons });
+  const rows = calcAnnualStandings({ cycle, seasons:state.seasons, divisions:state.divisions, eventsBySeason });
+  const baseline = seasonBaseline({ season, seasons:state.seasons });
   renderPyramid($('annualBody'), rows, baseline);
   const note = document.createElement('div');
-  note.className = 'muted';
-  note.style.cssText = 'text-align:center;margin-top:8px';
+  note.className = 'muted'; note.style.cssText = 'text-align:center;margin-top:8px';
   note.textContent = '※ 通期の持ち越し累積ポイント（基準 1,000L）';
   $('annualBody').appendChild(note);
+}
+
+function renderCriteria() {
+  const g = groupRules(state.rules);
+  const row = r => `
+    <div class="critrow">
+      ${iconImg(r.category,'ci') || '<span class="ci"></span>'}
+      <div><div class="clabel">${esc(r.category)}</div><div class="cdesc">${esc(r.label)}</div></div>
+      <div class="cpt ${r.kind}">${r.is_variable ? '±XXX L' : `${formatPoints(r.points)} L`}</div>
+    </div>`;
+  $('criteriaBody').innerHTML = `
+    <div class="crittbl deduct">
+      <div class="crithead">🚩 減点項目</div>
+      ${g.deduct.map(row).join('')}
+    </div>
+    <div class="crittbl add">
+      <div class="crithead">⭐ 加点項目</div>
+      ${g.add.map(row).join('')}
+    </div>`;
 }
 
 function renderApplyForm() {
@@ -389,38 +410,40 @@ function renderApplyForm() {
     `<optgroup label="減点">${g.deduct.map(opt).join('')}</optgroup>`;
   $('apDate').value = todayISO();
 }
-
 function currentRule() { return state.rules.find(r => r.id === $('apRule').value) || null; }
+function updateApPreview() {
+  const r = currentRule();
+  $('apPointsWrap').classList.toggle('hidden', !r?.is_variable);
+  const pv = $('apPreview');
+  if (!r) { pv.classList.add('hidden'); return; }
+  pv.classList.remove('hidden');
+  pv.innerHTML = `<div class="critrow" style="border:1px solid var(--line-soft);border-radius:10px">
+    ${iconImg(r.category,'ci') || '<span class="ci"></span>'}
+    <div><div class="clabel">${esc(r.category)}</div><div class="cdesc">${esc(r.label)}</div></div>
+    <div class="cpt ${r.kind}">${r.is_variable ? '±XXX L' : `${formatPoints(r.points)} L`}</div></div>`;
+}
 
 async function submitRequest() {
   const rule = currentRule();
-  const input = {
-    division_id: $('apDivision').value, requester_name: $('apName').value,
-    occurred_on: $('apDate').value, note: $('apNote').value, points: $('apPoints').value,
-  };
+  const input = { division_id:$('apDivision').value, requester_name:$('apName').value, occurred_on:$('apDate').value, note:$('apNote').value, points:$('apPoints').value };
   const v = validateRequestInput(input, rule);
   const msg = $('apMsg');
-  if (!v.ok) { msg.className = 'msg ngmsg'; msg.textContent = v.errors.join('\n'); return; }
+  if (!v.ok) { msg.className='msg ngmsg'; msg.textContent=v.errors.join('\n'); return; }
   $('apSubmit').disabled = true;
-  const payload = {
-    division_id: input.division_id, rule_id: rule.id, occurred_on: input.occurred_on,
-    requester_name: input.requester_name.trim(), note: input.note || null,
-  };
+  const payload = { division_id:input.division_id, rule_id:rule.id, occurred_on:input.occurred_on, requester_name:input.requester_name.trim(), note:input.note || null };
   if (rule.is_variable) payload.points = v.points;
   const { error } = await sb.from('l1_requests').insert(payload);
   $('apSubmit').disabled = false;
-  if (error) { msg.className = 'msg ngmsg'; msg.textContent = '申請に失敗しました: ' + error.message; return; }
-  msg.className = 'msg okmsg';
-  msg.textContent = '申請を受け付けました。運営の承認後にダッシュボードへ反映されます。';
-  $('apNote').value = ''; $('apPoints').value = '';
+  if (error) { msg.className='msg ngmsg'; msg.textContent='申請に失敗しました: ' + error.message; return; }
+  msg.className='msg okmsg'; msg.textContent='申請を受け付けました。運営の承認後にダッシュボードへ反映されます。';
+  $('apNote').value=''; $('apPoints').value='';
 }
 
 function switchTab(tab) {
-  for (const [btn, sec] of [['tabSeason', 'secSeason'], ['tabAnnual', 'secAnnual'], ['tabApply', 'secApply']]) {
-    $(btn).classList.toggle('active', btn === tab);
-    $(sec).classList.toggle('hidden', btn !== tab);
-  }
+  const map = [['tabSeason','secSeason'],['tabAnnual','secAnnual'],['tabCriteria','secCriteria'],['tabApply','secApply']];
+  for (const [btn, sec] of map) { $(btn).classList.toggle('active', btn === tab); $(sec).classList.toggle('hidden', btn !== tab); }
   if (tab === 'tabAnnual') renderAnnual();
+  if (tab === 'tabCriteria') renderCriteria();
 }
 
 async function init() {
@@ -432,10 +455,9 @@ async function init() {
     $('seasonSel').addEventListener('change', e => { state.selectedSeasonId = e.target.value; renderStandings(); });
     $('tabSeason').addEventListener('click', () => switchTab('tabSeason'));
     $('tabAnnual').addEventListener('click', () => switchTab('tabAnnual'));
+    $('tabCriteria').addEventListener('click', () => switchTab('tabCriteria'));
     $('tabApply').addEventListener('click', () => switchTab('tabApply'));
-    $('apRule').addEventListener('change', () => {
-      $('apPointsWrap').classList.toggle('hidden', !currentRule()?.is_variable);
-    });
+    $('apRule').addEventListener('change', updateApPreview);
     $('apSubmit').addEventListener('click', submitRequest);
   } catch (e) {
     $('loading').classList.add('hidden');
