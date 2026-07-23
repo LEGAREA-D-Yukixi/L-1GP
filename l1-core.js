@@ -185,7 +185,42 @@ export function validateRequestInput(input, rule) {
   return { ok: errors.length === 0, errors, points };
 }
 
-/** ルールを 加点/減点 でグルーピング（表示順ソート済み） */
+/** シーズンの基準線（持ち越し連鎖のrootの初期ポイント。通常1,000L） */
+export function seasonBaseline({ season, seasons }) {
+  if (!season) return 1000;
+  const byId = new Map((seasons || []).map(s => [s.id, s]));
+  let cur = season, guard = new Set(), depth = 0;
+  while (cur && cur.carryover_from && byId.has(cur.carryover_from) && !guard.has(cur.id) && depth < 50) {
+    guard.add(cur.id);
+    cur = byId.get(cur.carryover_from);
+    depth++;
+  }
+  return cur && Number.isFinite(Number(cur.initial_points)) ? Number(cur.initial_points) : 1000;
+}
+
+/** 順位表の基準線からの最大乖離（バーのスケール用。最低100Lは確保） */
+export function maxAbsDeviation(rows, baseline = 1000) {
+  return Math.max(100, ...(rows || []).map(r => Math.abs((Number(r.points) || 0) - baseline)));
+}
+
+/**
+ * 基準線バーの形状。1,000Lを中央として、上回れば右（プラス側）、下回れば左（マイナス側）へ伸ばす。
+ * 戻り値: { side:'up'|'down'|'zero', dev, pct } — pctは中央からの伸び幅(0-100)
+ */
+export function pointsBar({ points, baseline = 1000, maxAbs = 100 }) {
+  const dev = (Number(points) || 0) - baseline;
+  const scale = Math.max(1, Number(maxAbs) || 0);
+  const pct = Math.min(100, Math.round((Math.abs(dev) / scale) * 100));
+  return { side: dev > 0 ? 'up' : dev < 0 ? 'down' : 'zero', dev, pct };
+}
+
+/** 逆ピラミッド用: 順位に応じたカード幅(%)。1位が最も広く、順位が下がるほど狭くなる */
+export function pyramidWidth(rank, total, { min = 58, max = 100 } = {}) {
+  const n = Math.max(1, total);
+  if (n === 1) return max;
+  const r = Math.min(Math.max(1, rank), n);
+  return Math.round(max - ((max - min) * (r - 1)) / (n - 1));
+}
 export function groupRules(rules) {
   const act = (rules || []).filter(r => r.is_active !== false)
     .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
