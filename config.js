@@ -7,4 +7,4 @@
 export const SUPABASE_URL = 'https://yklwkovbphqmiucnmcmu.supabase.co';
 
 // Dashboard > Project Settings > API > anon public の値を貼り付け
-export const SUPABASE_ANON_KEY = 'sb_publishable_V34btW_6HTEdovDYrtiDUw_FDDb93KW';
+export const SUPABASE_ANON_KEY = 'ここにanonキーを貼り付け';

@@ -467,14 +467,28 @@ function renderSeasons() {
   $('seasonBody').innerHTML = `<table><thead><tr><th>名称</th><th>サイクル</th><th>期間</th><th>初期pt</th><th>状態</th><th></th></tr></thead><tbody>` +
     state.seasons.map(s => `
       <tr>
-        <td>${esc(s.name)}</td>
-        <td>${esc(s.cycle)}</td>
+        <td><input value="${esc(s.name)}" id="sn-${s.id}" style="min-width:150px"></td>
+        <td><input value="${esc(s.cycle)}" id="sc-${s.id}" style="min-width:90px"></td>
         <td class="muted">${esc(s.starts_on)} 〜 ${esc(s.ends_on)}</td>
         <td>${s.initial_points}</td>
-        <td>${s.is_active ? '<span class="badge on">開催中</span>' : '<span class="badge">－</span>'}</td>
-        <td>${s.is_active ? '' : `<button class="btn sm gray" data-activate="${s.id}">開催中にする</button>`}</td>
+        <td>${s.is_active ? '<span class="badge on">開催中</span>' : '<span class="badge">－</span>'}${s.carryover_from ? '<br><span class="muted">持越</span>' : ''}</td>
+        <td style="white-space:nowrap">
+          <button class="btn sm gray" data-saveseason="${s.id}">保存</button>
+          ${s.is_active ? '' : `<button class="btn sm gray" data-activate="${s.id}">開催中にする</button>`}
+        </td>
       </tr>`).join('') + '</tbody></table>';
   $('seasonBody').querySelectorAll('[data-activate]').forEach(b => b.addEventListener('click', () => activateSeason(b.dataset.activate)));
+  $('seasonBody').querySelectorAll('[data-saveseason]').forEach(b => b.addEventListener('click', () => saveSeason(b.dataset.saveseason)));
+}
+async function saveSeason(id) {
+  const name = $(`sn-${id}`).value.trim();
+  const cycle = $(`sc-${id}`).value.trim();
+  if (!name) { gmsg(false, 'シーズン名は必須です'); return; }
+  if (!cycle) { gmsg(false, '年間サイクルは必須です'); return; }
+  const { error } = await sb.from('l1_seasons').update({ name, cycle }).eq('id', id);
+  if (error) { gmsg(false, '保存に失敗: ' + error.message); return; }
+  gmsg(true, 'シーズンを保存しました');
+  await reloadAll();
 }
 async function activateSeason(id) {
   if (!confirm('このシーズンを「開催中」に切り替えます。よろしいですか？')) return;
