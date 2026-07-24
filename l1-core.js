@@ -222,6 +222,13 @@ export function pyramidWidth(rank, total, { min = 58, max = 100 } = {}) {
   const r = Math.min(Math.max(1, rank), n);
   return Math.round(max - ((max - min) * (r - 1)) / (n - 1));
 }
+
+/** 年間集計の表示ラベル: シーズン名から「上半期/下半期/前半戦/後半戦」を除いた期表記を返す */
+export function annualTermLabel(name) {
+  const s = String(name ?? '').trim();
+  const stripped = s.replace(/\s*(上半期|下半期|前半戦|後半戦)\s*$/, '').trim();
+  return stripped || s;
+}
 export function groupRules(rules) {
   const act = (rules || []).filter(r => r.is_active !== false)
     .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));

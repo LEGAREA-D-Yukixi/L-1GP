@@ -19,24 +19,26 @@
     font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,sans-serif; color:var(--text);
     background:var(--navy0); min-height:100vh;
   }
-  /* ===== ポスター調 背景（濃紺＋回路＋グロー） ===== */
+  /* ===== ポスター調 背景（濃紺＋回路＋グロー・全面適用） ===== */
   body::before {
     content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
     background:
-      radial-gradient(900px 420px at 50% -80px, rgba(53,200,255,.22), transparent 60%),
-      radial-gradient(700px 500px at 12% 18%, rgba(31,94,192,.28), transparent 55%),
-      radial-gradient(700px 500px at 88% 30%, rgba(20,60,140,.25), transparent 55%),
-      linear-gradient(180deg, #071231 0%, #050c22 55%, #03060f 100%);
+      radial-gradient(1100px 520px at 50% -60px, rgba(53,200,255,.26), transparent 62%),
+      radial-gradient(760px 560px at 10% 16%, rgba(31,94,192,.30), transparent 58%),
+      radial-gradient(760px 560px at 90% 26%, rgba(24,70,150,.28), transparent 58%),
+      radial-gradient(700px 620px at 50% 108%, rgba(20,60,140,.30), transparent 60%),
+      linear-gradient(180deg, #0a1738 0%, #071231 45%, #050c22 78%, #03060f 100%);
   }
   body::after {
-    content:""; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.5;
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.6;
     background-image:
-      linear-gradient(rgba(53,200,255,.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(53,200,255,.07) 1px, transparent 1px),
-      radial-gradient(circle, rgba(120,210,255,.5) 1.3px, transparent 1.6px);
-    background-size:46px 46px, 46px 46px, 138px 138px;
-    background-position:0 0,0 0,20px 30px;
-    mask-image:radial-gradient(circle at 50% 22%, #000 0%, transparent 78%);
+      linear-gradient(rgba(53,200,255,.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(53,200,255,.08) 1px, transparent 1px),
+      radial-gradient(circle, rgba(120,210,255,.55) 1.3px, transparent 1.7px);
+    background-size:48px 48px, 48px 48px, 144px 144px;
+    background-position:0 0, 0 0, 24px 34px;
+    mask-image:radial-gradient(140% 120% at 50% 40%, #000 55%, rgba(0,0,0,.25) 100%);
+    -webkit-mask-image:radial-gradient(140% 120% at 50% 40%, #000 55%, rgba(0,0,0,.25) 100%);
   }
   .wrap { max-width:940px; margin:0 auto; padding:14px 16px 90px; position:relative; z-index:1; }
 
@@ -169,7 +171,7 @@
     <div class="kicker">Division 対抗ポイントバトル！</div>
     <div class="logorow">
       <span class="logo">L-1</span>
-      <img class="logo-trophy" src="./icons/trophy.png" alt="トロフィー">
+      <img id="trophyImg" class="logo-trophy" alt="トロフィー">
       <span class="logo">グランプリ</span>
     </div>
     <div class="tagline">全員の力で優勝を勝ち取れ！</div>
@@ -237,7 +239,7 @@
     </div>
   </section>
 
-  <div class="foot-note">協力・挑戦・貢献で勝利を掴め！ ｜ 基準ポイント 1,000L</div>
+  <div class="foot-note"></div>
 </div>
 <footer class="sky"></footer>
 
@@ -246,25 +248,20 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import {
   isBlackout, isAnnualBlackout, seasonForDate, calcStandingsCarry, calcAnnualStandings,
-  validateRequestInput, groupRules, buildFeed, formatPoints, seasonBaseline, pointsBar, pyramidWidth,
+  validateRequestInput, groupRules, buildFeed, formatPoints, seasonBaseline, pointsBar, pyramidWidth, annualTermLabel,
 } from './l1-core.js';
+import { ICON_DATA, TROPHY } from './l1-icons.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = id => document.getElementById(id);
 const todayISO = () => new Date().toLocaleDateString('sv-SE');
 const EVENT_COLS = 'id, season_id, division_id, rule_id, points, occurred_on, request_id, created_at, voided_at';
 
-// 判定基準カテゴリ → ポスター切り出しアイコン
-const ICON_MAP = {
-  '稼働安定':'deduct_1','待機':'deduct_2','チーム定着':'deduct_3','セキュリティ':'deduct_4',
-  '勤怠管理':'deduct_5','備品管理':'deduct_6','申告漏れ':'deduct_7','ルール遵守':'deduct_8','ルール厳守':'deduct_8',
-  '採用受入':'add_1','イノベーション':'add_2','スキルアップ':'add_3','マルチ案件獲得':'add_4',
-  'マルチ案件継続':'add_5','リファラル採用':'add_6','面談代打':'add_7','不定期mission':'add_8',
-};
-const iconFile = cat => ICON_MAP[cat] ? `./icons/${ICON_MAP[cat]}.png` : null;
+// 判定基準カテゴリ → ポスター切り出しアイコン（base64埋め込み・ルール厳守/遵守を吸収）
+const iconFor = cat => ICON_DATA[cat] || (cat === 'ルール厳守' ? ICON_DATA['ルール遵守'] : null);
 function iconImg(cat, cls) {
-  const f = iconFile(cat);
-  return f ? `<img class="${cls}" src="${f}" alt="" onerror="this.style.display='none'">` : '';
+  const d = iconFor(cat);
+  return d ? `<img class="${cls}" src="${d}" alt="">` : '';
 }
 
 let state = { divisions: [], seasons: [], rules: [], events: [], selectedSeasonId: null };
@@ -359,10 +356,11 @@ function renderStandings() {
 }
 
 function renderAnnual() {
-  const season = state.seasons.find(s => s.id === state.selectedSeasonId) || state.seasons.at(-1);
+  const active = state.seasons.find(s => s.is_active);
+  const season = active || state.seasons.find(s => s.id === state.selectedSeasonId) || state.seasons.at(-1);
   const cycle = season?.cycle;
   if (!cycle) { $('annualBody').innerHTML = '<div class="card muted">データがありません</div>'; return; }
-  $('annualTitle').textContent = `年間集計 ${cycle}`;
+  $('annualTitle').textContent = `年間集計 ${annualTermLabel(season.name)}`;
   if (isAnnualBlackout({ cycle, seasons:state.seasons }, todayISO())) {
     $('annualBody').innerHTML = `
       <div class="card blackout">
@@ -375,10 +373,6 @@ function renderAnnual() {
   const rows = calcAnnualStandings({ cycle, seasons:state.seasons, divisions:state.divisions, eventsBySeason });
   const baseline = seasonBaseline({ season, seasons:state.seasons });
   renderPyramid($('annualBody'), rows, baseline);
-  const note = document.createElement('div');
-  note.className = 'muted'; note.style.cssText = 'text-align:center;margin-top:8px';
-  note.textContent = '※ 通期の持ち越し累積ポイント（基準 1,000L）';
-  $('annualBody').appendChild(note);
 }
 
 function renderCriteria() {
@@ -447,6 +441,7 @@ function switchTab(tab) {
 }
 
 async function init() {
+  $('trophyImg').src = TROPHY;
   try {
     await loadAll();
     $('loading').classList.add('hidden');
