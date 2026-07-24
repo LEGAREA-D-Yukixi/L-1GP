@@ -75,6 +75,7 @@
       <button data-tab="tabMaster">マスタ</button>
       <button data-tab="tabSeasons">シーズン</button>
       <button data-tab="tabAdmins">管理者</button>
+      <button data-tab="tabApplicants">申請者</button>
     </div>
     <div id="gMsg" class="msg"></div>
 
@@ -177,6 +178,18 @@
       </div>
       <div class="muted" style="margin-top:8px">※ 先にDashboard &gt; Authentication &gt; Users でユーザーを作成してください。</div>
     </section>
+
+    <!-- 申請者 -->
+    <section id="tabApplicants" class="card hidden">
+      <h2>申請者（ポイント申請できる人）</h2>
+      <div class="muted" style="margin-bottom:8px">ここに登録したメールのアカウントだけがポイント申請ページを開いて申請できます（管理者は自動的に申請可）。</div>
+      <div id="aplBody"></div>
+      <div class="row" style="margin-top:10px; align-items:flex-end">
+        <div><label>申請を許可するメールアドレス</label><input id="newAplEmail" type="email" placeholder="member@legarea.jp"></div>
+        <div style="flex:0"><button class="btn sm" id="newAplBtn">追加</button></div>
+      </div>
+      <div class="muted" style="margin-top:8px">※ 本人はこのメールでログインできる必要があります（Authユーザー作成、または申請ページからのサインアップ）。</div>
+    </section>
   </div>
 </div>
 
@@ -227,22 +240,24 @@ async function logout() { await sb.auth.signOut(); location.reload(); }
 
 // ---------- データ取得 ----------
 async function reloadAll() {
-  const [dv, ss, rl, rq, ev, ad] = await Promise.all([
+  const [dv, ss, rl, rq, ev, ad, apl] = await Promise.all([
     sb.from('l1_divisions').select('*').order('display_order'),
     sb.from('l1_seasons').select('*').order('starts_on'),
     sb.from('l1_rules').select('*').order('display_order'),
     sb.from('l1_requests').select('*').eq('status', 'pending').order('created_at'),
     sb.from('l1_events_full').select('*').order('occurred_on', { ascending: false }).limit(2000),
     sb.from('l1_admins').select('*').order('created_at'),
+    sb.from('l1_applicants').select('*').order('created_at'),
   ]);
   for (const r of [dv, ss, rl, rq, ev, ad]) if (r.error) { gmsg(false, '読み込みエラー: ' + r.error.message); return; }
   state.divisions = dv.data; state.seasons = ss.data; state.rules = rl.data;
   state.requests = rq.data; state.events = ev.data; state.admins = ad.data;
+  state.applicants = (apl && !apl.error) ? apl.data : [];
   renderAll();
 }
 function renderAll() {
   renderRequests(); renderDirectForm(); renderEvents(); renderStandings();
-  renderMasters(); renderSeasons(); renderAdmins();
+  renderMasters(); renderSeasons(); renderAdmins(); renderApplicants();
 }
 const dName = id => state.divisions.find(d => d.id === id)?.name ?? '(不明)';
 const rOf = id => state.rules.find(r => r.id === id);
@@ -364,11 +379,11 @@ function renderStandings() {
   const season = state.seasons.find(s => s.id === sid);
   if (!season) { $('stBody').innerHTML = '<div class="muted">シーズンがありません。</div>'; return; }
   const eventsBySeason = new Map(state.seasons.map(s => [s.id, state.events.filter(e => e.season_id === s.id)]));
-  const rows = calcStandingsCarry({ season, seasons: state.seasons, divisions: state.divisions, eventsBySeason });
+  const rows = calcStandingsCarry({ season, seasons: state.seasons, divisions: state.divisions.filter(d=>d.is_active!==false), eventsBySeason });
   const table = rs => `<table><thead><tr><th>順位</th><th>Division</th><th style="text-align:right">L-Point</th></tr></thead><tbody>` +
     rs.map(r => `<tr><td class="${r.rank === 1 ? 'rank1' : ''}">${r.rank}</td><td>${esc(r.name)}</td><td style="text-align:right;font-weight:700">${r.points.toLocaleString()} L</td></tr>`).join('') + '</tbody></table>';
   $('stBody').innerHTML = table(rows);
-  const annual = calcAnnualStandings({ cycle: season.cycle, seasons: state.seasons, divisions: state.divisions, eventsBySeason });
+  const annual = calcAnnualStandings({ cycle: season.cycle, seasons: state.seasons, divisions: state.divisions.filter(d=>d.is_active!==false), eventsBySeason });
   $('stAnnual').innerHTML = `<h2>年間集計 ${esc(season.cycle)}</h2>` + table(annual);
 }
 
@@ -380,21 +395,26 @@ function renderMasters() {
         <td><input value="${esc(d.name)}" id="dn-${d.id}"></td>
         <td><input type="number" value="${d.display_order}" id="do-${d.id}" style="width:70px"></td>
         <td><input type="checkbox" ${d.is_active ? 'checked' : ''} id="da-${d.id}" style="width:auto"></td>
-        <td><button class="btn sm gray" data-savediv="${d.id}">保存</button></td>
+        <td style="white-space:nowrap"><button class="btn sm gray" data-savediv="${d.id}">保存</button>
+          <button class="btn sm red" data-deldiv="${d.id}">削除</button></td>
       </tr>`).join('') + '</tbody></table>';
   $('divBody').querySelectorAll('[data-savediv]').forEach(b => b.addEventListener('click', () => saveDivision(b.dataset.savediv)));
+  $('divBody').querySelectorAll('[data-deldiv]').forEach(b => b.addEventListener('click', () => deleteDivision(b.dataset.deldiv)));
 
-  $('ruleBody').innerHTML = `<table><thead><tr><th>区分</th><th>指標</th><th>内容</th><th>pt</th><th>有効</th><th></th></tr></thead><tbody>` +
+  $('ruleBody').innerHTML = `<table><thead><tr><th>区分</th><th>指標</th><th>内容</th><th>単位</th><th>pt</th><th>有効</th><th></th></tr></thead><tbody>` +
     state.rules.slice().sort((a, b) => a.display_order - b.display_order).map(r => `
       <tr>
         <td>${r.kind === 'add' ? '<span class="add">加点</span>' : '<span class="deduct">減点</span>'}</td>
-        <td>${esc(r.category)}</td>
-        <td><input value="${esc(r.label)}" id="rl-${r.id}"></td>
+        <td><input value="${esc(r.category)}" id="rc-${r.id}" style="min-width:110px"></td>
+        <td><input value="${esc(r.label)}" id="rl-${r.id}" style="min-width:150px"></td>
+        <td><input value="${esc(r.unit || '')}" id="ru-${r.id}" style="width:64px"></td>
         <td>${r.is_variable ? '<span class="muted">可変</span>' : `<input type="number" value="${r.points}" id="rp-${r.id}" style="width:80px">`}</td>
         <td><input type="checkbox" ${r.is_active ? 'checked' : ''} id="ra-${r.id}" style="width:auto"></td>
-        <td><button class="btn sm gray" data-saverule="${r.id}">保存</button></td>
+        <td style="white-space:nowrap"><button class="btn sm gray" data-saverule="${r.id}">保存</button>
+          <button class="btn sm red" data-delrule="${r.id}">削除</button></td>
       </tr>`).join('') + '</tbody></table>';
   $('ruleBody').querySelectorAll('[data-saverule]').forEach(b => b.addEventListener('click', () => saveRule(b.dataset.saverule)));
+  $('ruleBody').querySelectorAll('[data-delrule]').forEach(b => b.addEventListener('click', () => deleteRule(b.dataset.delrule)));
 }
 async function saveDivision(id) {
   const name = $(`dn-${id}`).value.trim();
@@ -404,6 +424,20 @@ async function saveDivision(id) {
   }).eq('id', id);
   if (error) { gmsg(false, '保存に失敗: ' + error.message); return; }
   gmsg(true, 'Divisionを保存しました');
+  await reloadAll();
+}
+function isFkError(e) { return e && (e.code === '23503' || /foreign key|violates|referenced|依存|参照/i.test(e.message || '')); }
+async function deleteDivision(id) {
+  const d = state.divisions.find(x => x.id === id);
+  if (!confirm(`Division「${d?.name ?? ''}」を削除しますか？\n（過去のポイント記録がある場合は削除できません。その場合は「有効」を外して保存すると順位・申請から除外できます）`)) return;
+  const { error } = await sb.from('l1_divisions').delete().eq('id', id);
+  if (error) {
+    gmsg(false, isFkError(error)
+      ? 'このDivisionは過去のポイント記録に使用されているため削除できません。「有効」のチェックを外して保存すると、順位・申請から除外できます。'
+      : '削除に失敗: ' + error.message);
+    return;
+  }
+  gmsg(true, 'Divisionを削除しました');
   await reloadAll();
 }
 async function addDivision() {
@@ -448,9 +482,12 @@ async function addRule() {
 }
 async function saveRule(id) {
   const r = rOf(id);
+  const category = $(`rc-${id}`).value.trim();
   const label = $(`rl-${id}`).value.trim();
+  const unit = $(`ru-${id}`).value.trim() || '回';
+  if (!category) { gmsg(false, '指標は必須です'); return; }
   if (!label) { gmsg(false, '内容は必須です'); return; }
-  const upd = { label, is_active: $(`ra-${id}`).checked };
+  const upd = { category, label, unit, is_active: $(`ra-${id}`).checked };
   if (!r.is_variable) {
     const pts = parseInt($(`rp-${id}`).value, 10);
     if (!Number.isInteger(pts) || pts === 0) { gmsg(false, 'ポイントは0以外の整数で入力してください'); return; }
@@ -459,8 +496,24 @@ async function saveRule(id) {
     upd.points = pts;
   }
   const { error } = await sb.from('l1_rules').update(upd).eq('id', id);
-  if (error) { gmsg(false, '保存に失敗: ' + error.message); return; }
+  if (error) {
+    gmsg(false, /duplicate|unique/i.test(error.message) ? '同じ内容の判定基準が既に存在します' : '保存に失敗: ' + error.message);
+    return;
+  }
   gmsg(true, '判定基準を保存しました');
+  await reloadAll();
+}
+async function deleteRule(id) {
+  const r = rOf(id);
+  if (!confirm(`判定基準「${r?.category ?? ''}｜${r?.label ?? ''}」を削除しますか？\n（過去のポイント記録がある場合は削除できません。その場合は「有効」を外して保存すると申請・表示から除外できます）`)) return;
+  const { error } = await sb.from('l1_rules').delete().eq('id', id);
+  if (error) {
+    gmsg(false, isFkError(error)
+      ? 'この判定基準は過去のポイント記録に使用されているため削除できません。「有効」のチェックを外して保存すると、今後の申請・表示から除外できます。'
+      : '削除に失敗: ' + error.message);
+    return;
+  }
+  gmsg(true, '判定基準を削除しました');
   await reloadAll();
 }
 
@@ -571,6 +624,35 @@ async function delAdmin(user_id) {
   await reloadAll();
 }
 
+// ---------- 申請者 ----------
+function renderApplicants() {
+  const list = state.applicants || [];
+  $('aplBody').innerHTML = `<table><thead><tr><th>メール</th><th>登録日</th><th></th></tr></thead><tbody>` +
+    (list.length ? list.map(a => `
+      <tr>
+        <td>${esc(a.email)}</td>
+        <td class="muted">${esc((a.created_at || '').slice(0, 10))}</td>
+        <td><button class="btn sm red" data-delapl="${esc(a.email)}">削除</button></td>
+      </tr>`).join('') : '<tr><td colspan="3" class="muted">まだ申請者が登録されていません。</td></tr>') + '</tbody></table>';
+  $('aplBody').querySelectorAll('[data-delapl]').forEach(b => b.addEventListener('click', () => delApplicant(b.dataset.delapl)));
+}
+async function addApplicant() {
+  const email = $('newAplEmail').value.trim();
+  if (!email) { gmsg(false, 'メールアドレスを入力してください'); return; }
+  const { error } = await sb.rpc('l1_add_applicant', { p_email: email });
+  if (error) { gmsg(false, '追加に失敗: ' + error.message); return; }
+  $('newAplEmail').value = '';
+  gmsg(true, '申請者を追加しました');
+  await reloadAll();
+}
+async function delApplicant(email) {
+  if (!confirm(`${email} の申請権限を削除しますか？`)) return;
+  const { error } = await sb.from('l1_applicants').delete().eq('email', email);
+  if (error) { gmsg(false, '削除に失敗: ' + error.message); return; }
+  gmsg(true, '申請者を削除しました');
+  await reloadAll();
+}
+
 // ---------- タブ・初期化 ----------
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('active', x === b));
@@ -590,6 +672,7 @@ $('nrBtn').addEventListener('click', addRule);
 $('nrVariable').addEventListener('change', () => $('nrPointsWrap').classList.toggle('hidden', $('nrVariable').checked));
 $('nsBtn').addEventListener('click', addSeason);
 $('newAdmBtn').addEventListener('click', addAdmin);
+$('newAplBtn').addEventListener('click', addApplicant);
 
 afterAuth(); // セッションが残っていれば自動ログイン
 </script>
