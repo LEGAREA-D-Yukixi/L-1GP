@@ -229,6 +229,18 @@ export function annualTermLabel(name) {
   const stripped = s.replace(/\s*(上半期|下半期|前半戦|後半戦)\s*$/, '').trim();
   return stripped || s;
 }
+
+/** 順位表(ポイント降順)で、1つ上の順位との差分。1位はnull。戻り値は current - 上位（0以下）*/
+export function rankGaps(rows) {
+  return (rows || []).map((r, i) =>
+    i === 0 ? null : (Number(r.points) || 0) - (Number(rows[i - 1].points) || 0));
+}
+
+/** 1位の2位に対するリード（正の値）。2件未満なら null */
+export function leadOverSecond(rows) {
+  if (!rows || rows.length < 2) return null;
+  return (Number(rows[0].points) || 0) - (Number(rows[1].points) || 0);
+}
 export function groupRules(rules) {
   const act = (rules || []).filter(r => r.is_active !== false)
     .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));

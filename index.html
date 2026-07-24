@@ -23,23 +23,37 @@
   body::before {
     content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
     background:
-      radial-gradient(1100px 520px at 50% -60px, rgba(53,200,255,.26), transparent 62%),
-      radial-gradient(760px 560px at 10% 16%, rgba(31,94,192,.30), transparent 58%),
-      radial-gradient(760px 560px at 90% 26%, rgba(24,70,150,.28), transparent 58%),
-      radial-gradient(700px 620px at 50% 108%, rgba(20,60,140,.30), transparent 60%),
-      linear-gradient(180deg, #0a1738 0%, #071231 45%, #050c22 78%, #03060f 100%);
+      radial-gradient(1200px 560px at 50% -80px, rgba(60,205,255,.34), transparent 60%),
+      radial-gradient(820px 600px at 8% 14%, rgba(38,110,215,.40), transparent 56%),
+      radial-gradient(820px 600px at 92% 24%, rgba(28,84,180,.38), transparent 56%),
+      radial-gradient(760px 640px at 50% 110%, rgba(24,74,165,.40), transparent 58%),
+      linear-gradient(180deg, #0c1c46 0%, #0a1738 40%, #06102a 74%, #03060f 100%);
   }
   body::after {
-    content:""; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.6;
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.7;
     background-image:
-      linear-gradient(rgba(53,200,255,.08) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(53,200,255,.08) 1px, transparent 1px),
-      radial-gradient(circle, rgba(120,210,255,.55) 1.3px, transparent 1.7px);
-    background-size:48px 48px, 48px 48px, 144px 144px;
-    background-position:0 0, 0 0, 24px 34px;
-    mask-image:radial-gradient(140% 120% at 50% 40%, #000 55%, rgba(0,0,0,.25) 100%);
-    -webkit-mask-image:radial-gradient(140% 120% at 50% 40%, #000 55%, rgba(0,0,0,.25) 100%);
+      /* 回路グリッド */
+      linear-gradient(rgba(70,190,255,.10) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(70,190,255,.10) 1px, transparent 1px),
+      /* 斜めの回路トレース */
+      repeating-linear-gradient(45deg, rgba(70,190,255,.05) 0 2px, transparent 2px 26px),
+      /* 光るノード */
+      radial-gradient(circle, rgba(130,220,255,.7) 1.6px, transparent 2px);
+    background-size:52px 52px, 52px 52px, 200px 200px, 156px 156px;
+    background-position:0 0, 0 0, 0 0, 26px 36px;
+    mask-image:radial-gradient(150% 130% at 50% 42%, #000 60%, rgba(0,0,0,.35) 100%);
+    -webkit-mask-image:radial-gradient(150% 130% at 50% 42%, #000 60%, rgba(0,0,0,.35) 100%);
   }
+  /* スパークル（星）レイヤー */
+  .bgfx { position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.9; }
+  .bgfx b {
+    position:absolute; width:2px; height:2px; border-radius:50%; background:#dff3ff;
+    box-shadow:0 0 6px 2px rgba(150,225,255,.9), 0 0 12px 4px rgba(90,180,255,.4);
+  }
+  .bgfx b:nth-child(1){left:12%;top:10%} .bgfx b:nth-child(2){left:83%;top:8%;width:3px;height:3px}
+  .bgfx b:nth-child(3){left:47%;top:5%} .bgfx b:nth-child(4){left:24%;top:22%}
+  .bgfx b:nth-child(5){left:68%;top:18%} .bgfx b:nth-child(6){left:91%;top:33%}
+  .bgfx b:nth-child(7){left:6%;top:38%} .bgfx b:nth-child(8){left:55%;top:30%;width:3px;height:3px}
   .wrap { max-width:940px; margin:0 auto; padding:14px 16px 90px; position:relative; z-index:1; }
 
   /* ===== ヘッダー ===== */
@@ -88,7 +102,7 @@
           background:linear-gradient(180deg,rgba(18,40,92,.92),rgba(9,22,54,.92)); border:1px solid var(--line-soft);
           border-radius:12px; padding:11px 14px; display:grid; grid-template-columns:54px 1fr auto; align-items:center; gap:12px; transition:width .25s ease; }
   .prow .rk { font-weight:900; font-size:19px; text-align:center; color:var(--cyan-soft); }
-  .prow .icon { width:26px; height:26px; object-fit:contain; vertical-align:middle; margin-right:6px; }
+  .prow .icon { width:26px; height:26px; object-fit:contain; vertical-align:middle; margin-right:6px; border-radius:5px; }
   .prow .nm { font-weight:800; font-size:15px; display:flex; align-items:center; flex-wrap:wrap; }
   .prow .sub { font-size:11px; color:var(--muted); margin-top:2px; }
   .prow .val { text-align:right; white-space:nowrap; }
@@ -132,7 +146,7 @@
   .crittbl.deduct .crithead { background:linear-gradient(90deg,rgba(53,200,255,.28),transparent); color:var(--cyan-soft); }
   .crittbl.add .crithead { background:linear-gradient(90deg,rgba(255,110,180,.28),transparent); color:#ff9ecb; }
   .critrow { display:grid; grid-template-columns:44px 1fr auto; align-items:center; gap:10px; padding:9px 12px; border-top:1px solid rgba(53,200,255,.12); font-size:13px; }
-  .critrow .ci { width:30px; height:30px; object-fit:contain; }
+  .critrow .ci { width:30px; height:30px; object-fit:contain; border-radius:6px; }
   .critrow .clabel { font-weight:700; }
   .critrow .cdesc { color:var(--muted); font-size:11px; margin-top:1px; }
   .critrow .cpt { font-weight:900; white-space:nowrap; }
@@ -143,7 +157,7 @@
   .feeditem { display:flex; justify-content:space-between; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line-soft); font-size:13px; align-items:center; }
   .feeditem:last-child { border-bottom:none; }
   .feeditem .left { min-width:0; display:flex; align-items:center; gap:8px; }
-  .feeditem .fi { width:22px; height:22px; object-fit:contain; flex:0 0 auto; }
+  .feeditem .fi { width:22px; height:22px; object-fit:contain; flex:0 0 auto; border-radius:5px; }
   .feeditem .date { color:var(--muted); margin-right:6px; font-variant-numeric:tabular-nums; }
   .add { color:var(--add); font-weight:800; }
   .deduct { color:var(--deduct); font-weight:800; }
@@ -159,13 +173,18 @@
   .hidden { display:none !important; }
   #loading { color:var(--muted); padding:26px; text-align:center; }
 
-  footer.sky { position:fixed; left:0; right:0; bottom:0; height:72px; z-index:0; pointer-events:none;
-    background:linear-gradient(180deg,transparent,rgba(3,6,15,.92)),repeating-linear-gradient(90deg,rgba(31,94,192,.28) 0 14px,transparent 14px 30px);
-    mask-image:linear-gradient(180deg,transparent,#000 60%); }
+  footer.sky { position:fixed; left:0; right:0; bottom:0; height:150px; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(600px 160px at 50% 120%, rgba(53,200,255,.22), transparent 70%),
+      url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%221440%22%20height%3D%22170%22%20viewBox%3D%220%200%201440%20170%22%3E%3Cg%20fill%3D%22%230a1b3d%22%3E%3Crect%20x%3D%220%22%20y%3D%22111%22%20width%3D46%20height%3D59%20rx%3D2/%3E%3Crect%20x%3D%2251%22%20y%3D%22121%22%20width%3D29%20height%3D49%20rx%3D2/%3E%3Crect%20x%3D%2286%22%20y%3D%2284%22%20width%3D32%20height%3D86%20rx%3D2/%3E%3Crect%20x%3D%22124%22%20y%3D%2266%22%20width%3D29%20height%3D104%20rx%3D2/%3E%3Crect%20x%3D%22156%22%20y%3D%22119%22%20width%3D28%20height%3D51%20rx%3D2/%3E%3Crect%20x%3D%22189%22%20y%3D%22122%22%20width%3D52%20height%3D48%20rx%3D2/%3E%3Crect%20x%3D%22244%22%20y%3D%2260%22%20width%3D31%20height%3D110%20rx%3D2/%3E%3Crect%20x%3D%22280%22%20y%3D%2225%22%20width%3D29%20height%3D145%20rx%3D2/%3E%3Crect%20x%3D%22315%22%20y%3D%22102%22%20width%3D33%20height%3D68%20rx%3D2/%3E%3Crect%20x%3D%22355%22%20y%3D%2257%22%20width%3D29%20height%3D113%20rx%3D2/%3E%3Crect%20x%3D%22390%22%20y%3D%22124%22%20width%3D51%20height%3D46%20rx%3D2/%3E%3Crect%20x%3D%22444%22%20y%3D%2259%22%20width%3D28%20height%3D111%20rx%3D2/%3E%3Crect%20x%3D%22475%22%20y%3D%2277%22%20width%3D44%20height%3D93%20rx%3D2/%3E%3Crect%20x%3D%22522%22%20y%3D%22115%22%20width%3D60%20height%3D55%20rx%3D2/%3E%3Crect%20x%3D%22588%22%20y%3D%2259%22%20width%3D45%20height%3D111%20rx%3D2/%3E%3Crect%20x%3D%22640%22%20y%3D%22117%22%20width%3D37%20height%3D53%20rx%3D2/%3E%3Crect%20x%3D%22683%22%20y%3D%2283%22%20width%3D38%20height%3D87%20rx%3D2/%3E%3Crect%20x%3D%22723%22%20y%3D%2258%22%20width%3D30%20height%3D112%20rx%3D2/%3E%3Crect%20x%3D%22755%22%20y%3D%2267%22%20width%3D39%20height%3D103%20rx%3D2/%3E%3Crect%20x%3D%22801%22%20y%3D%2276%22%20width%3D60%20height%3D94%20rx%3D2/%3E%3Crect%20x%3D%22865%22%20y%3D%2256%22%20width%3D55%20height%3D114%20rx%3D2/%3E%3Crect%20x%3D%22925%22%20y%3D%2292%22%20width%3D49%20height%3D78%20rx%3D2/%3E%3Crect%20x%3D%22977%22%20y%3D%2241%22%20width%3D37%20height%3D129%20rx%3D2/%3E%3Crect%20x%3D%221017%22%20y%3D%2257%22%20width%3D31%20height%3D113%20rx%3D2/%3E%3Crect%20x%3D%221052%22%20y%3D%2267%22%20width%3D59%20height%3D103%20rx%3D2/%3E%3Crect%20x%3D%221115%22%20y%3D%2294%22%20width%3D54%20height%3D76%20rx%3D2/%3E%3Crect%20x%3D%221175%22%20y%3D%22115%22%20width%3D30%20height%3D55%20rx%3D2/%3E%3Crect%20x%3D%221211%22%20y%3D%22109%22%20width%3D52%20height%3D61%20rx%3D2/%3E%3Crect%20x%3D%221267%22%20y%3D%2268%22%20width%3D35%20height%3D102%20rx%3D2/%3E%3Crect%20x%3D%221307%22%20y%3D%2245%22%20width%3D28%20height%3D125%20rx%3D2/%3E%3Crect%20x%3D%221337%22%20y%3D%2287%22%20width%3D46%20height%3D83%20rx%3D2/%3E%3Crect%20x%3D%221390%22%20y%3D%2254%22%20width%3D48%20height%3D116%20rx%3D2/%3E%3C/g%3E%3C/svg%3E") repeat-x bottom center / auto 150px;
+    opacity:.9;
+    mask-image:linear-gradient(180deg, transparent, #000 45%);
+    -webkit-mask-image:linear-gradient(180deg, transparent, #000 45%); }
   .foot-note { text-align:center; color:var(--muted); font-size:11px; margin-top:18px; }
 </style>
 </head>
 <body>
+<div class="bgfx"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
 <div class="wrap">
   <header>
     <div class="kicker">Division 対抗ポイントバトル！</div>
@@ -248,7 +267,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import {
   isBlackout, isAnnualBlackout, seasonForDate, calcStandingsCarry, calcAnnualStandings,
-  validateRequestInput, groupRules, buildFeed, formatPoints, seasonBaseline, pointsBar, pyramidWidth, annualTermLabel,
+  validateRequestInput, groupRules, buildFeed, formatPoints, seasonBaseline, pointsBar, pyramidWidth, annualTermLabel, rankGaps, leadOverSecond,
 } from './l1-core.js';
 import { ICON_DATA, TROPHY } from './l1-icons.js';
 
@@ -286,27 +305,40 @@ function renderSeasonSelect() {
     `<option value="${s.id}" ${s.id === state.selectedSeasonId ? 'selected' : ''}>${esc(s.name)}${s.is_active ? '（開催中）' : ''}</option>`).join('');
 }
 
-/** 逆ピラミッド + 基準線ゲージ（左端0・中央1,000） */
+/** 逆ピラミッド + 基準線ゲージ（左端0・中央1,000）＋ 1つ上の順位との差 */
 function renderPyramid(container, rows, baseline) {
   const total = rows.length;
+  const gaps = rankGaps(rows);
+  const lead = leadOverSecond(rows);
   container.innerHTML = '<div id="podium"></div>';
   const podium = container.querySelector('#podium');
-  rows.forEach(r => {
+  rows.forEach((r, i) => {
     const isChamp = r.rank === 1;
     const isLast = r.rank === total && total > 1;
     const width = pyramidWidth(r.rank, total);
     const bar = pointsBar({ points:r.points, baseline });
-    const devLabel = bar.dev === 0 ? '±0' : (bar.dev > 0 ? `+${bar.dev}` : `${bar.dev}`);
-    const devClass = bar.dev > 0 ? 'add' : bar.dev < 0 ? 'deduct' : 'muted';
+    const gap = gaps[i]; // 1つ上との差（1位はnull・2位以降は0以下）
+    // 順位カードのサブ表示・右側の差分表示
+    let subText, devText, devClass;
+    if (i === 0) {
+      subText = lead == null ? '🏆 首位' : `🏆 首位（2位に +${lead.toLocaleString()}L）`;
+      devText = lead == null ? '首位' : `+${lead.toLocaleString()} L`;
+      devClass = 'add';
+    } else {
+      const g = gap ?? 0;
+      subText = `1つ上との差 ${g > 0 ? '+' : ''}${g.toLocaleString()}L`;
+      devText = `${g > 0 ? '+' : ''}${g.toLocaleString()} L`;
+      devClass = g < 0 ? 'deduct' : 'muted';
+    }
     const el = document.createElement('div');
     el.className = 'prow' + (isChamp ? ' champ' : '') + (isLast ? ' last' : '');
     el.style.width = width + '%';
     el.innerHTML = `
       <div class="rk">${isChamp ? '<div class="crown">👑</div>' : ''}${isLast ? '<span class="skull">☠</span>' : ''}<div>${r.rank}位</div></div>
       <div class="nm">${esc(r.name)}${isChamp ? '<span class="champ-tag">王者</span>' : ''}${isLast ? '<span class="last-tag">最下位</span>' : ''}
-        <span class="sub" style="width:100%">基準1,000Lから ${devLabel}L</span></div>
+        <span class="sub" style="width:100%">${subText}</span></div>
       <div class="val"><div class="pt">${r.points.toLocaleString()}<span style="font-size:12px"> L</span></div>
-        <div class="dev ${devClass}">${devLabel} L</div></div>
+        <div class="dev ${devClass}">${devText}</div></div>
       <div class="gauge">
         <div class="fill ${bar.side === 'down' ? 'down' : 'up'}" style="width:${bar.fillPct}%"></div>
         <div class="center" style="left:${bar.centerPct}%"></div>
