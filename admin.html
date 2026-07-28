@@ -64,16 +64,19 @@
   <div id="adminUI" class="hidden">
     <div class="row" style="align-items:center; justify-content:space-between">
       <div class="muted" id="whoami"></div>
-      <div><button class="btn gray sm" id="logoutBtn">ログアウト</button></div>
+      <div style="display:flex; gap:8px">
+        <a class="btn sm" id="dashLink" href="./index.html" style="text-decoration:none">ダッシュボード</a>
+        <button class="btn gray sm" id="logoutBtn">ログアウト</button>
+      </div>
     </div>
 
     <div class="tabs">
       <button data-tab="tabReq" class="active">申請承認 <span id="pendingCount" class="badge"></span></button>
       <button data-tab="tabDirect">直接登録</button>
-      <button data-tab="tabEvents">イベント一覧</button>
+      <button data-tab="tabEvents">申請履歴</button>
       <button data-tab="tabStandings">順位（常時表示）</button>
+      <button data-tab="tabIndividual" id="tabIndividualBtn" class="hidden">個人成績</button>
       <button data-tab="tabMaster">マスタ</button>
-      <button data-tab="tabSeasons">シーズン</button>
       <button data-tab="tabAdmins">管理者</button>
       <button data-tab="tabApplicants">申請者</button>
     </div>
@@ -97,17 +100,28 @@
         <div id="dcPointsWrap" class="hidden"><label>ポイント（不定期mission）</label><input id="dcPoints" type="number" step="1"></div>
         <div><label>発生日</label><input id="dcDate" type="date"></div>
       </div>
+      <label>ポイント獲得者名（個人成績に集計されます）</label>
+      <input id="dcEarner" type="text" maxlength="100" placeholder="例: 山田 太郎">
       <label>理由・詳細（管理者のみ閲覧）</label>
       <textarea id="dcNote" rows="2" maxlength="2000"></textarea>
       <div style="margin-top:12px"><button class="btn" id="dcSubmit">登録する</button></div>
       <div id="dcMsg" class="msg"></div>
     </section>
 
-    <!-- イベント一覧 -->
+    <!-- 申請履歴 -->
     <section id="tabEvents" class="card hidden">
-      <h2>イベント一覧（理由込み・打消し可能）</h2>
+      <h2>申請履歴（承認済みポイントの記録・打消し可能）</h2>
       <label>シーズン</label><select id="evSeason" style="max-width:280px"></select>
       <div id="evBody" style="margin-top:10px"></div>
+    </section>
+
+    <!-- 個人成績 -->
+    <section id="tabIndividual" class="card hidden">
+      <h2>個人成績ランキング（ポイント獲得者別）</h2>
+      <div class="row" style="align-items:flex-end">
+        <div><label>集計対象</label><select id="indScope"></select></div>
+      </div>
+      <div id="indBody" style="margin-top:12px"></div>
     </section>
 
     <!-- 順位 -->
@@ -145,27 +159,6 @@
       </div>
       <div style="margin-top:12px"><button class="btn" id="nrBtn">判定基準を追加</button></div>
       <div id="nrMsg" class="msg"></div>
-    </section>
-
-    <!-- シーズン -->
-    <section id="tabSeasons" class="card hidden">
-      <h2>シーズン管理</h2>
-      <div class="muted">「開催中にする」で現在のactiveシーズンを解除し、対象を有効化します（ポイントは新シーズンで1,000Lから再スタート）。</div>
-      <div id="seasonBody" style="margin-top:10px"></div>
-      <h2 style="margin-top:20px">新規シーズン追加</h2>
-      <div class="row">
-        <div><label>名称</label><input id="nsName" placeholder="2026-2027 前半戦"></div>
-        <div><label>年間サイクル</label><input id="nsCycle" placeholder="2026-2027"></div>
-      </div>
-      <div class="row">
-        <div><label>開始日</label><input id="nsStart" type="date"></div>
-        <div><label>終了日</label><input id="nsEnd" type="date"></div>
-        <div><label>初期ポイント</label><input id="nsInit" type="number" value="1000"></div>
-      </div>
-      <label>初期ポイントの引き継ぎ元（前シーズンから引き継ぐ場合に選択）</label>
-      <select id="nsCarry"></select>
-      <div style="margin-top:12px"><button class="btn" id="nsBtn">追加する</button></div>
-      <div id="nsMsg" class="msg"></div>
     </section>
 
     <!-- 管理者 -->
@@ -234,6 +227,9 @@ async function afterAuth() {
   $('whoami').textContent = `ログイン中: ${user.email}`;
   $('loginCard').classList.add('hidden');
   $('adminUI').classList.remove('hidden');
+  // 個人成績の閲覧権限
+  try { const { data } = await sb.rpc('l1_can_view_individual'); state.canIndividual = !!data; } catch { state.canIndividual = false; }
+  $('tabIndividualBtn').classList.toggle('hidden', !state.canIndividual);
   await reloadAll();
 }
 async function logout() { await sb.auth.signOut(); location.reload(); }
@@ -257,7 +253,8 @@ async function reloadAll() {
 }
 function renderAll() {
   renderRequests(); renderDirectForm(); renderEvents(); renderStandings();
-  renderMasters(); renderSeasons(); renderAdmins(); renderApplicants();
+  renderMasters(); renderAdmins(); renderApplicants();
+  if (state.canIndividual) renderIndividualControls();
 }
 const dName = id => state.divisions.find(d => d.id === id)?.name ?? '(不明)';
 const rOf = id => state.rules.find(r => r.id === id);
@@ -266,7 +263,7 @@ const rOf = id => state.rules.find(r => r.id === id);
 function renderRequests() {
   $('pendingCount').textContent = state.requests.length;
   if (state.requests.length === 0) { $('reqBody').innerHTML = '<div class="muted">承認待ちの申請はありません。</div>'; return; }
-  $('reqBody').innerHTML = `<table><thead><tr><th>申請日</th><th>発生日</th><th>Division</th><th>項目</th><th>pt</th><th>申請者</th><th>詳細</th><th></th></tr></thead><tbody>` +
+  $('reqBody').innerHTML = `<table><thead><tr><th>申請日</th><th>発生日</th><th>Division</th><th>項目</th><th>pt</th><th>獲得者</th><th>申請者</th><th>詳細</th><th></th></tr></thead><tbody>` +
     state.requests.map(q => {
       const r = rOf(q.rule_id);
       const variable = !!r?.is_variable;
@@ -278,6 +275,7 @@ function renderRequests() {
         <td>${variable
           ? `<input type="number" step="1" value="${q.points ?? ''}" id="qp-${q.id}" style="width:90px">`
           : `<span class="${(q.points ?? 0) >= 0 ? 'add' : 'deduct'}">${esc(formatPoints(q.points))}</span>`}</td>
+        <td>${esc(q.earner_name ?? '')}</td>
         <td>${esc(q.requester_name)}</td>
         <td class="muted" style="max-width:220px">${esc(q.note ?? '')}</td>
         <td style="white-space:nowrap">
@@ -329,15 +327,16 @@ async function directSubmit() {
   const { error } = await sb.from('l1_events').insert({
     season_id: season.id, division_id: input.division_id, rule_id: rule.id,
     points: v.points, occurred_on: input.occurred_on, note: input.note || null,
+    earner_name: $('dcEarner').value.trim() || null,
   });
   $('dcSubmit').disabled = false;
   if (error) { flash($('dcMsg'), false, '登録に失敗: ' + error.message); return; }
   flash($('dcMsg'), true, '登録しました（ダッシュボードへ即時反映）');
-  $('dcNote').value = ''; $('dcPoints').value = '';
+  $('dcNote').value = ''; $('dcPoints').value = ''; $('dcEarner').value = '';
   await reloadAll();
 }
 
-// ---------- イベント一覧・打消し ----------
+// ---------- 申請履歴・打消し ----------
 function seasonOptions(sel, selectedId) {
   sel.innerHTML = state.seasons.map(s =>
     `<option value="${s.id}" ${s.id === selectedId ? 'selected' : ''}>${esc(s.name)}${s.is_active ? '（開催中）' : ''}</option>`).join('');
@@ -517,95 +516,57 @@ async function deleteRule(id) {
   await reloadAll();
 }
 
-// ---------- シーズン ----------
-function renderSeasons() {
-  const carryOptions = (sid, current) =>
-    '<option value="">引き継がない（初期pt）</option>' +
-    state.seasons.filter(s => s.id !== sid).map(s =>
-      `<option value="${s.id}" ${s.id === current ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
-  $('seasonBody').innerHTML = `<table><thead><tr><th>名称</th><th>サイクル</th><th>引き継ぎ元</th><th>期間</th><th>初期pt</th><th>状態</th><th></th></tr></thead><tbody>` +
-    state.seasons.map(s => `
-      <tr>
-        <td><input value="${esc(s.name)}" id="sn-${s.id}" style="min-width:140px"></td>
-        <td><input value="${esc(s.cycle)}" id="sc-${s.id}" style="min-width:80px"></td>
-        <td><select id="sf-${s.id}" style="min-width:120px">${carryOptions(s.id, s.carryover_from)}</select></td>
-        <td class="muted">${esc(s.starts_on)}〜${esc(s.ends_on)}</td>
-        <td>${s.initial_points}</td>
-        <td>${s.is_active ? '<span class="badge on">開催中</span>' : '<span class="badge">－</span>'}</td>
-        <td style="white-space:nowrap">
-          <button class="btn sm gray" data-saveseason="${s.id}">保存</button>
-          ${s.is_active ? '' : `<button class="btn sm gray" data-activate="${s.id}">開催中にする</button>`}
-          ${s.is_active ? '' : `<button class="btn sm red" data-delseason="${s.id}">削除</button>`}
-        </td>
-      </tr>`).join('') + '</tbody></table>';
-  $('seasonBody').querySelectorAll('[data-activate]').forEach(b => b.addEventListener('click', () => activateSeason(b.dataset.activate)));
-  $('seasonBody').querySelectorAll('[data-saveseason]').forEach(b => b.addEventListener('click', () => saveSeason(b.dataset.saveseason)));
-  $('seasonBody').querySelectorAll('[data-delseason]').forEach(b => b.addEventListener('click', () => deleteSeason(b.dataset.delseason)));
-  // 新規追加フォームの引き継ぎ元セレクト
-  $('nsCarry').innerHTML = '<option value="">引き継がない（初期ポイントを使用）</option>' +
-    state.seasons.map(s => `<option value="${s.id}">${esc(s.name)} の最終ポイントを引き継ぐ</option>`).join('');
+// ---------- 個人成績（専用権限のみ） ----------
+function renderIndividualControls() {
+  const opts = ['<option value="">（現在のシーズン）</option>']
+    .concat(state.seasons.slice().reverse().map(s => `<option value="season:${s.id}">${esc(s.name)}</option>`));
+  // 年間（cycle）単位も選べるように
+  const cycles = [...new Set(state.seasons.map(s => s.cycle))];
+  for (const c of cycles) opts.push(`<option value="cycle:${esc(c)}">年間：${esc(c)}</option>`);
+  $('indScope').innerHTML = opts.join('');
+  $('indScope').onchange = loadIndividual;
+  loadIndividual();
 }
-async function saveSeason(id) {
-  const name = $(`sn-${id}`).value.trim();
-  const cycle = $(`sc-${id}`).value.trim();
-  const carry = $(`sf-${id}`).value || null;
-  if (!name) { gmsg(false, 'シーズン名は必須です'); return; }
-  if (!cycle) { gmsg(false, '年間サイクルは必須です'); return; }
-  if (carry === id) { gmsg(false, '自分自身は引き継ぎ元にできません'); return; }
-  const { error } = await sb.from('l1_seasons').update({ name, cycle, carryover_from: carry }).eq('id', id);
-  if (error) { gmsg(false, '保存に失敗: ' + error.message); return; }
-  gmsg(true, 'シーズンを保存しました');
-  await reloadAll();
-}
-async function deleteSeason(id) {
-  const s = state.seasons.find(x => x.id === id);
-  if (!confirm(`シーズン「${s?.name ?? ''}」を削除します。よろしいですか？`)) return;
-  const { error } = await sb.from('l1_seasons').delete().eq('id', id);
-  if (error) {
-    const m = /開催中|イベント|持ち越し/.test(error.message) ? error.message.replace(/^.*L1: /, '') : error.message;
-    gmsg(false, '削除できません: ' + m);
-    return;
+async function loadIndividual() {
+  const val = $('indScope').value;
+  let args = {};
+  if (val.startsWith('season:')) args = { p_season_id: val.slice(7) };
+  else if (val.startsWith('cycle:')) args = { p_cycle: val.slice(6) };
+  else {
+    const active = state.seasons.find(s => s.is_active) || state.seasons.at(-1);
+    args = active ? { p_season_id: active.id } : {};
   }
-  gmsg(true, 'シーズンを削除しました');
-  await reloadAll();
-}
-async function activateSeason(id) {
-  if (!confirm('このシーズンを「開催中」に切り替えます。よろしいですか？')) return;
-  const plan = seasonActivationPlan(state.seasons, id);
-  for (const off of plan.deactivate) {
-    const { error } = await sb.from('l1_seasons').update({ is_active: false }).eq('id', off);
-    if (error) { gmsg(false, '切替に失敗: ' + error.message); return; }
-  }
-  const { error } = await sb.from('l1_seasons').update({ is_active: true }).eq('id', plan.activate);
-  if (error) { gmsg(false, '切替に失敗: ' + error.message); return; }
-  gmsg(true, 'シーズンを切り替えました');
-  await reloadAll();
-}
-async function addSeason() {
-  const name = $('nsName').value.trim(), cycle = $('nsCycle').value.trim();
-  const starts_on = $('nsStart').value, ends_on = $('nsEnd').value;
-  const initial_points = parseInt($('nsInit').value, 10);
-  if (!name || !cycle || !starts_on || !ends_on) { flash($('nsMsg'), false, '全項目を入力してください'); return; }
-  if (!(ends_on > starts_on)) { flash($('nsMsg'), false, '終了日は開始日より後にしてください'); return; }
-  if (!Number.isInteger(initial_points) || initial_points < 0) { flash($('nsMsg'), false, '初期ポイントが不正です'); return; }
-  const carry = $('nsCarry').value || null;
-  const { error } = await sb.from('l1_seasons').insert({ name, cycle, starts_on, ends_on, initial_points, is_active: false, carryover_from: carry });
-  if (error) { flash($('nsMsg'), false, '追加に失敗: ' + error.message); return; }
-  flash($('nsMsg'), true, carry ? 'シーズンを追加しました（前シーズンからポイントを引き継ぎます）' : 'シーズンを追加しました（開催中への切替は一覧から）');
-  $('nsName').value = ''; $('nsCycle').value = '';
-  await reloadAll();
+  const { data, error } = await sb.rpc('l1_individual_standings', args);
+  if (error) { $('indBody').innerHTML = `<div class="msg ngmsg" style="display:block">取得に失敗: ${esc(error.message)}</div>`; return; }
+  const rows = data || [];
+  if (rows.length === 0) { $('indBody').innerHTML = '<div class="muted">対象の獲得記録がありません（申請・直接登録で「ポイント獲得者名」を入力すると集計されます）。</div>'; return; }
+  $('indBody').innerHTML = `<table><thead><tr><th>順位</th><th>獲得者</th><th style="text-align:right">合計pt</th><th style="text-align:right">件数</th></tr></thead><tbody>` +
+    rows.map((r, i) => `<tr>
+      <td style="text-align:center;font-weight:900">${i + 1}</td>
+      <td>${esc(r.earner_name)}</td>
+      <td style="text-align:right;font-weight:900">${Number(r.points).toLocaleString()} L</td>
+      <td style="text-align:right" class="muted">${r.entries}</td>
+    </tr>`).join('') + '</tbody></table>';
 }
 
-// ---------- 管理者 ----------
 function renderAdmins() {
-  $('admBody').innerHTML = `<table><thead><tr><th>メール</th><th>登録日</th><th></th></tr></thead><tbody>` +
+  $('admBody').innerHTML = `<table><thead><tr><th>メール</th><th>登録日</th><th style="text-align:center">個人成績の閲覧</th><th></th></tr></thead><tbody>` +
     state.admins.map(a => `
       <tr>
         <td>${esc(a.email ?? a.user_id)}</td>
         <td class="muted">${esc((a.created_at || '').slice(0, 10))}</td>
+        <td style="text-align:center"><input type="checkbox" ${a.can_view_individual ? 'checked' : ''} data-indadm="${a.user_id}" style="width:auto"></td>
         <td>${a.user_id === state.user?.id ? '<span class="muted">自分</span>' : `<button class="btn sm red" data-deladm="${a.user_id}">削除</button>`}</td>
-      </tr>`).join('') + '</tbody></table>';
+      </tr>`).join('') + '</tbody></table>'
+    + '<div class="muted" style="margin-top:6px">「個人成績の閲覧」をONにした管理者だけが、個人成績ランキングのタブを見られます。</div>';
   $('admBody').querySelectorAll('[data-deladm]').forEach(b => b.addEventListener('click', () => delAdmin(b.dataset.deladm)));
+  $('admBody').querySelectorAll('[data-indadm]').forEach(b => b.addEventListener('change', () => toggleIndividual(b.dataset.indadm, b.checked)));
+}
+async function toggleIndividual(user_id, on) {
+  const { error } = await sb.from('l1_admins').update({ can_view_individual: on }).eq('user_id', user_id);
+  if (error) { gmsg(false, '更新に失敗: ' + error.message); await reloadAll(); return; }
+  gmsg(true, `個人成績の閲覧権限を${on ? '付与' : '解除'}しました`);
+  if (user_id === state.user?.id) { state.canIndividual = on; $('tabIndividualBtn').classList.toggle('hidden', !on); }
 }
 async function addAdmin() {
   const email = $('newAdmEmail').value.trim();
@@ -656,7 +617,7 @@ async function delApplicant(email) {
 // ---------- タブ・初期化 ----------
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('active', x === b));
-  for (const sec of ['tabReq', 'tabDirect', 'tabEvents', 'tabStandings', 'tabMaster', 'tabSeasons', 'tabAdmins']) {
+  for (const sec of ['tabReq', 'tabDirect', 'tabEvents', 'tabStandings', 'tabIndividual', 'tabMaster', 'tabAdmins', 'tabApplicants']) {
     $(sec).classList.toggle('hidden', sec !== b.dataset.tab);
   }
 }));
@@ -670,7 +631,6 @@ $('stSeason').addEventListener('change', renderStandings);
 $('newDivBtn').addEventListener('click', addDivision);
 $('nrBtn').addEventListener('click', addRule);
 $('nrVariable').addEventListener('change', () => $('nrPointsWrap').classList.toggle('hidden', $('nrVariable').checked));
-$('nsBtn').addEventListener('click', addSeason);
 $('newAdmBtn').addEventListener('click', addAdmin);
 $('newAplBtn').addEventListener('click', addApplicant);
 
