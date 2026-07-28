@@ -80,13 +80,13 @@
   }
 
   /* ===== 見出し（▶▶ … ◀◀） ===== */
-  .banner { display:flex; align-items:center; justify-content:center; gap:12px; margin:14px 0 10px;
-            font-weight:900; font-size:clamp(17px,4.4vw,22px); text-shadow:0 0 12px rgba(53,200,255,.55); }
-  .banner .tri { color:var(--cyan); letter-spacing:-2px; font-size:15px; }
+  .banner { display:flex; align-items:center; justify-content:center; gap:12px; margin:16px 0 12px;
+            font-weight:900; font-size:clamp(20px,4.8vw,26px); text-shadow:0 0 12px rgba(53,200,255,.55); }
+  .banner .tri { color:var(--cyan); letter-spacing:-2px; font-size:17px; }
 
   .tabs { display:flex; gap:8px; margin:4px 0; flex-wrap:wrap; justify-content:center; }
   .tabs button { background:rgba(10,24,56,.75); color:var(--cyan-soft); border:1px solid var(--line-soft);
-                 border-radius:8px; padding:9px 15px; cursor:pointer; font-size:14px; font-weight:700; transition:.15s; }
+                 border-radius:8px; padding:11px 18px; cursor:pointer; font-size:16px; font-weight:800; transition:.15s; }
   .tabs button:hover { border-color:var(--cyan); }
   .tabs button.active { background:linear-gradient(90deg,var(--cyan),#1b8fd6); color:#06122e; border-color:var(--cyan); box-shadow:0 0 16px rgba(53,200,255,.4); }
 
@@ -106,44 +106,43 @@
   @keyframes tw{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.25)}}
   @keyframes champGlow{0%,100%{box-shadow:0 0 24px rgba(255,198,39,.4),inset 0 2px 0 rgba(255,225,150,.35),inset 0 -6px 14px rgba(0,0,0,.4)}50%{box-shadow:0 0 44px rgba(255,198,39,.72),inset 0 2px 0 rgba(255,225,150,.5),inset 0 -6px 14px rgba(0,0,0,.4)}}
   @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-  #podium { display:flex; flex-direction:column; align-items:center; gap:11px; }
-  .medallion { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:17px; color:#2a1c00;
+  #podium { display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .medallion { width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:20px; color:#2a1c00;
     box-shadow:0 3px 8px rgba(0,0,0,.5),inset 0 2px 4px rgba(255,255,255,.6),inset 0 -3px 6px rgba(0,0,0,.35); border:2px solid rgba(255,255,255,.35); flex:0 0 auto; }
+  .medallion.mlarge { width:76px; height:76px; font-size:38px; border-width:3px; }
   .m-gold{background:var(--g-gold)} .m-silver{background:var(--g-silver)} .m-bronze{background:var(--g-bronze)}
   .m-blue{background:linear-gradient(150deg,#8fd0ff,#2f7fd0,#173a7e);color:#eaf6ff;text-shadow:0 1px 2px rgba(0,0,0,.5)}
   .m-danger{background:linear-gradient(150deg,#fff2a8,#ffd400,#b39400);color:#3a2b00}
-  .prow { position:relative; margin:0 auto; width:100%; display:grid; grid-template-columns:58px 1fr auto; align-items:center; gap:14px;
-    border-radius:16px; padding:14px 16px; color:var(--text); transition:width .25s ease;
+  .prow { position:relative; margin:0 auto; width:100%; display:grid; grid-template-columns:84px 1fr auto; align-items:center; gap:16px;
+    border-radius:16px; padding:16px 20px; color:var(--text); transition:width .25s ease;
     background:linear-gradient(180deg,rgba(30,58,124,.96),rgba(10,24,60,.98)); border:1px solid rgba(90,160,255,.35);
     box-shadow:0 10px 24px rgba(0,0,0,.42),inset 0 2px 0 rgba(150,205,255,.35),inset 0 -6px 14px rgba(0,0,0,.4); }
-  .prow .nm { font-weight:800; font-size:16px; display:flex; align-items:center; flex-wrap:wrap; }
-  .prow .sub { font-size:11px; color:var(--muted); display:block; width:100%; margin-top:2px; }
+  .prow > .medallion:not(.mlarge) { justify-self:center; }
+  .prow .nm { font-weight:800; font-size:19px; display:flex; align-items:center; flex-wrap:wrap; }
   .prow .val { text-align:right; white-space:nowrap; }
-  .prow .val .pt { font-weight:900; font-size:20px; }
+  .prow .val .pt { font-weight:900; font-size:24px; }
 
-  /* ミニ基準線ゲージ: 左端0・中央1,000 */
-  .mini { position:relative; height:14px; background:rgba(2,8,24,.85); border-radius:7px; overflow:hidden; border:1px solid var(--line-soft); margin-top:8px; width:100%; }
-  .mini .f { position:absolute; left:0; top:0; bottom:0; border-radius:7px 0 0 7px; }
+  /* ミニ基準線ゲージ: 左端0・中央1,000（数字なし） */
+  .mini { position:relative; height:16px; background:rgba(2,8,24,.85); border-radius:8px; overflow:hidden; border:1px solid var(--line-soft); margin-top:10px; width:100%; }
+  .mini .f { position:absolute; left:0; top:0; bottom:0; border-radius:8px 0 0 8px; }
   .mini .f.up { background:linear-gradient(90deg,rgba(56,224,138,.5),var(--add)); }
   .mini .f.down { background:linear-gradient(90deg,rgba(255,85,110,.5),var(--deduct)); }
   .mini .f.champ { background:var(--g-gold); }
   .mini .c { position:absolute; left:50%; top:-2px; bottom:-2px; width:2px; background:rgba(255,255,255,.65); }
-  .mini .z { position:absolute; left:4px; top:0; font-size:8px; color:rgba(255,255,255,.5); line-height:14px; }
-  .mini .k { position:absolute; left:50%; transform:translateX(-50%); top:0; font-size:8px; color:rgba(255,255,255,.85); line-height:14px; font-weight:800; }
 
   /* 1位 = 王者（金オーラ＋トロフィー） */
   .prow.champ { background:linear-gradient(180deg,rgba(92,66,14,.7),rgba(30,24,8,.92)); border:2px solid var(--gold); animation:champGlow 2.8s ease-in-out infinite; }
-  .prow.champ .nm { font-size:20px; color:var(--gold-soft); text-shadow:0 0 14px rgba(255,198,39,.5); }
-  .prow.champ .val .pt { font-size:24px; color:var(--gold-soft); }
-  .prow .c-tro { position:absolute; right:14px; top:-20px; height:56px; filter:drop-shadow(0 6px 14px rgba(255,198,39,.6)); animation:floaty 4s ease-in-out infinite; }
-  .champ-tag { display:inline-block; font-size:10px; font-weight:900; color:#2a1c00; background:var(--g-gold); padding:2px 9px; border-radius:11px; margin-left:7px; }
+  .prow.champ .nm { font-size:23px; color:var(--gold-soft); text-shadow:0 0 14px rgba(255,198,39,.5); }
+  .prow.champ .val .pt { font-size:28px; color:var(--gold-soft); }
+  .prow .c-tro { position:absolute; right:16px; top:-22px; height:62px; filter:drop-shadow(0 6px 14px rgba(255,198,39,.6)); animation:floaty 4s ease-in-out infinite; }
+  .champ-tag { display:inline-block; font-size:12px; font-weight:900; color:#2a1c00; background:var(--g-gold); padding:2px 10px; border-radius:11px; margin-left:8px; }
 
   /* 最下位 = 危険（ハザードテープ） */
   .prow.last { border:2px solid var(--danger); background:linear-gradient(180deg,rgba(80,14,26,.85),rgba(40,8,16,.95)); }
   .prow.last .nm { color:#ffc0cc; }
   .prow.last::after { content:""; position:absolute; left:0; right:0; bottom:0; height:6px; border-radius:0 0 14px 14px;
     background:repeating-linear-gradient(45deg,#ffe000 0 12px,#1a1a1a 12px 24px); }
-  .last-tag { display:inline-block; font-size:10px; font-weight:900; color:#2a0008; background:var(--danger); padding:2px 9px; border-radius:11px; margin-left:7px; }
+  .last-tag { display:inline-block; font-size:12px; font-weight:900; color:#2a0008; background:var(--danger); padding:2px 10px; border-radius:11px; margin-left:8px; }
   .last-note { text-align:center; color:var(--danger); font-size:12px; font-weight:700; margin-top:6px; }
   .gappos{color:var(--add)} .gapneg{color:var(--deduct)}
 
@@ -163,12 +162,22 @@
   .critrow .cpt.add { color:var(--add); }
   .critrow .cpt.deduct { color:var(--deduct); }
 
-  /* ===== フィード ===== */
-  .feeditem { display:flex; justify-content:space-between; gap:10px; padding:11px 4px; border-bottom:1px solid var(--line-soft); font-size:15px; align-items:center; }
+  /* ===== ポイント増減履歴 ===== */
+  .feedbar { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .feedbar label { margin:0; font-weight:800; color:var(--cyan-soft); }
+  .feedbar select { max-width:320px; }
+  .feeditem { display:flex; justify-content:space-between; gap:12px; padding:13px 4px; border-bottom:1px solid var(--line-soft); font-size:17px; align-items:center; }
   .feeditem:last-child { border-bottom:none; }
-  .feeditem .left { min-width:0; display:flex; align-items:center; gap:8px; }
-  .feeditem .fi { width:26px; height:26px; object-fit:contain; flex:0 0 auto; border-radius:5px; }
-  .feeditem .date { color:var(--muted); margin-right:6px; font-variant-numeric:tabular-nums; }
+  .feeditem .left { min-width:0; display:flex; align-items:center; gap:12px; }
+  .feeditem .fi { width:40px; height:40px; object-fit:contain; flex:0 0 auto; display:block; }
+  .feeditem .ftext { min-width:0; }
+  .feeditem .date { color:var(--muted); margin-right:8px; font-variant-numeric:tabular-nums; }
+  .feeditem .fpt { font-weight:900; font-size:18px; white-space:nowrap; }
+  .pager { display:flex; align-items:center; justify-content:center; gap:14px; margin-top:12px; }
+  .pager .pgbtn { background:rgba(10,24,56,.9); color:var(--cyan-soft); border:1px solid var(--line-soft); border-radius:9px; padding:8px 14px; font-weight:800; font-size:14px; cursor:pointer; }
+  .pager .pgbtn:hover:not(:disabled) { border-color:var(--cyan); }
+  .pager .pgbtn:disabled { opacity:.4; cursor:default; }
+  .pager .pginfo { color:var(--muted); font-size:14px; }
   .add { color:var(--add); font-weight:800; }
   .deduct { color:var(--deduct); font-weight:800; }
   .muted { color:var(--muted); font-size:12px; }
@@ -219,16 +228,16 @@
 
   <!-- 順位 -->
   <section id="secSeason" class="hidden">
-    <div class="card">
-      <label for="seasonSel">シーズン</label>
-      <select id="seasonSel"></select>
-    </div>
     <div class="banner"><span class="tri">▶▶▶</span><span id="standingsTitle">現在の順位</span><span class="tri">◀◀◀</span></div>
     <div id="standingsBody"></div>
-    <div class="banner"><span class="tri">▶▶</span>ポイント増減フィード<span class="tri">◀◀</span></div>
+    <div class="banner"><span class="tri">▶▶</span>ポイント増減履歴<span class="tri">◀◀</span></div>
     <div class="card">
-      <div class="muted" id="feedNote">直近の加点・減点の記録です（基準は 1,000L）。</div>
+      <div class="feedbar">
+        <label for="feedSeasonSel">期間</label>
+        <select id="feedSeasonSel"></select>
+      </div>
       <div id="feedBody"></div>
+      <div id="feedPager" class="pager"></div>
     </div>
   </section>
 
@@ -322,7 +331,7 @@ function iconImg(cat, cls) {
   return d ? `<img class="${cls}" src="${d}" alt="">` : '';
 }
 
-let state = { divisions: [], seasons: [], rules: [], events: [], selectedSeasonId: null };
+let state = { divisions: [], seasons: [], rules: [], events: [], selectedSeasonId: null, feedSeasonId: null, feedPage: 0 };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 function showErr(msg) { const b=$('errBox'); b.className='msg ngmsg'; b.textContent=msg; }
 
@@ -339,23 +348,24 @@ async function loadAll() {
   state.selectedSeasonId = active ? active.id : (state.seasons.at(-1)?.id ?? null);
 }
 
-function renderSeasonSelect() {
-  $('seasonSel').innerHTML = state.seasons.map(s =>
-    `<option value="${s.id}" ${s.id === state.selectedSeasonId ? 'selected' : ''}>${esc(s.name)}${s.is_active ? '（開催中）' : ''}</option>`).join('');
-}
-
-/** 案3: 3D深度 逆ピラミッド + ミニ基準線ゲージ（左端0・中央1,000） */
+/** 案3: 3D深度 逆ピラミッド + ミニ基準線ゲージ（左端0・中央1,000／数字なし） */
 function renderPyramid(container, rows, baseline) {
   const total = rows.length;
+  const maxRank = rows.length ? Math.max(...rows.map(r => r.rank)) : 0;
   container.innerHTML = '<div id="podium"></div>';
   const podium = container.querySelector('#podium');
   rows.forEach((r, i) => {
-    const isChamp = i === 0;
-    const isLast = i === total - 1 && total > 1;
+    const isChamp = r.rank === 1;
+    const isLast = r.rank === maxRank && total > 1;
     const width = pyramidWidth(r.rank, total);
     const bar = pointsBar({ points:r.points, baseline });
-    // メダリオン（1〜3位は金銀銅、以降は青、最下位は危険色）
-    const mcls = i === 0 ? 'm-gold' : i === 1 ? 'm-silver' : i === 2 ? 'm-bronze' : (isLast ? 'm-danger' : 'm-blue');
+    // メダル色は「順位」で決定（同順位は同じ色）。最下位は危険色。
+    const mcls = isLast ? 'm-danger'
+      : r.rank === 1 ? 'm-gold'
+      : r.rank === 2 ? 'm-silver'
+      : r.rank === 3 ? 'm-bronze'
+      : 'm-blue';
+    const big = (isChamp || isLast) ? ' mlarge' : '';
     const badge = isChamp ? '👑' : (isLast ? '☠' : r.rank);
     const fillCls = isChamp ? 'champ' : (bar.side === 'down' ? 'down' : 'up');
     const el = document.createElement('div');
@@ -363,45 +373,74 @@ function renderPyramid(container, rows, baseline) {
     el.style.width = width + '%';
     el.innerHTML = `
       ${isChamp ? `<img class="c-tro" src="${TROPHY}" alt="">` : ''}
-      <div class="medallion ${mcls}">${badge}</div>
+      <div class="medallion ${mcls}${big}">${badge}</div>
       <div><div class="nm">${esc(r.name)}${isChamp ? '<span class="champ-tag">王者</span>' : ''}${isLast ? '<span class="last-tag">最下位</span>' : ''}</div>
-        <div class="mini"><div class="f ${fillCls}" style="width:${bar.fillPct}%"></div><div class="c" style="left:${bar.centerPct}%"></div><span class="z">0</span><span class="k" style="left:${bar.centerPct}%">1,000</span></div>
+        <div class="mini"><div class="f ${fillCls}" style="width:${bar.fillPct}%"></div><div class="c" style="left:${bar.centerPct}%"></div></div>
       </div>
-      <div class="val"><div class="pt">${r.points.toLocaleString()}<span style="font-size:13px"> L</span></div></div>`;
+      <div class="val"><div class="pt">${r.points.toLocaleString()}<span style="font-size:14px"> L</span></div></div>`;
     podium.appendChild(el);
   });
 }
 
 function renderStandings() {
-  const season = state.seasons.find(s => s.id === state.selectedSeasonId);
+  const season = state.seasons.find(s => s.is_active)
+    || state.seasons.find(s => s.id === state.selectedSeasonId)
+    || state.seasons.at(-1);
   if (!season) { $('standingsBody').innerHTML = '<div class="card muted">シーズンがありません</div>'; return; }
+  state.selectedSeasonId = season.id;
   const eventsBySeason = new Map(state.seasons.map(s => [s.id, state.events.filter(e => e.season_id === s.id)]));
   const rows = calcStandingsCarry({ season, seasons:state.seasons, divisions:state.divisions.filter(d=>d.is_active!==false), eventsBySeason });
   const baseline = seasonBaseline({ season, seasons:state.seasons });
   const blackout = isBlackout(season, todayISO());
-  const carried = !!season.carryover_from;
-  $('standingsTitle').textContent = `${season.name}${carried ? '（持ち越し）' : ''}`;
+  $('standingsTitle').textContent = season.name;
 
   if (blackout) {
     $('standingsBody').innerHTML = `
       <div class="card blackout">
         <div class="big">🤫 順位は決起会で発表！</div>
         <p>結果発表月のため、順位と現在ポイントは非公開です。</p>
-        <p>ポイントの増減は下のフィードで確認できます。</p>
+        <p>ポイントの増減は下の履歴で確認できます。</p>
       </div>`;
   } else {
     renderPyramid($('standingsBody'), rows, baseline);
   }
+  renderFeedControls();
+}
 
-  const seasonEvents = state.events.filter(e => e.season_id === season.id);
-  const feed = buildFeed({ events:seasonEvents, divisions:state.divisions, rules:state.rules, limit:60 });
+// ポイント増減履歴（上期・下期ごと＝シーズン単位／ページング）
+const FEED_PAGE_SIZE = 30;
+function renderFeedControls() {
+  const sel = $('feedSeasonSel');
+  const seasons = state.seasons.slice().sort((a, b) => (a.starts_on < b.starts_on ? 1 : -1)); // 新しい順
+  if (!state.feedSeasonId || !seasons.some(s => s.id === state.feedSeasonId)) {
+    state.feedSeasonId = (state.seasons.find(s => s.is_active) || seasons[0])?.id ?? null;
+  }
+  sel.innerHTML = seasons.map(s =>
+    `<option value="${s.id}" ${s.id === state.feedSeasonId ? 'selected' : ''}>${esc(s.name)}${s.is_active ? '（開催中）' : ''}</option>`).join('');
+  state.feedPage = 0;
+  renderFeed();
+}
+function renderFeed() {
+  const seasonEvents = state.events.filter(e => e.season_id === state.feedSeasonId);
+  const feed = buildFeed({ events:seasonEvents, divisions:state.divisions, rules:state.rules, limit:100000 });
+  const pages = Math.max(1, Math.ceil(feed.length / FEED_PAGE_SIZE));
+  state.feedPage = Math.min(Math.max(0, state.feedPage), pages - 1);
+  const slice = feed.slice(state.feedPage * FEED_PAGE_SIZE, (state.feedPage + 1) * FEED_PAGE_SIZE);
   $('feedBody').innerHTML = feed.length === 0
-    ? '<div class="muted" style="padding:12px 0">まだ記録がありません。</div>'
-    : feed.map(f => `
+    ? '<div class="muted" style="padding:12px 0">この期間の記録はまだありません。</div>'
+    : slice.map(f => `
       <div class="feeditem">
-        <div class="left">${iconImg(f.category,'fi')}<span><span class="date">${esc(f.occurred_on)}</span><b>${esc(f.division_name)}</b>　${esc(f.category)}<span class="muted">（${esc(f.label)}）</span></span></div>
-        <div class="${f.kind === 'add' ? 'add' : 'deduct'}">${esc(f.points_label)} L</div>
+        <div class="left">${iconImg(f.category,'fi')}<span class="ftext"><span class="date">${esc(f.occurred_on)}</span><b>${esc(f.division_name)}</b>　${esc(f.category)}<span class="muted">（${esc(f.label)}）</span></span></div>
+        <div class="fpt ${f.kind === 'add' ? 'add' : 'deduct'}">${esc(f.points_label)} L</div>
       </div>`).join('');
+  // ページャ
+  if (feed.length <= FEED_PAGE_SIZE) { $('feedPager').innerHTML = ''; return; }
+  $('feedPager').innerHTML = `
+    <button class="pgbtn" id="feedPrev" ${state.feedPage === 0 ? 'disabled' : ''}>← 新しい</button>
+    <span class="pginfo">${state.feedPage + 1} / ${pages}ページ（全${feed.length}件）</span>
+    <button class="pgbtn" id="feedNext" ${state.feedPage >= pages - 1 ? 'disabled' : ''}>古い →</button>`;
+  $('feedPrev')?.addEventListener('click', () => { state.feedPage--; renderFeed(); });
+  $('feedNext')?.addEventListener('click', () => { state.feedPage++; renderFeed(); });
 }
 
 function renderAnnual() {
@@ -538,9 +577,9 @@ async function init() {
   try {
     await loadAll();
     $('loading').classList.add('hidden');
-    renderSeasonSelect(); renderStandings(); renderApplyForm();
+    renderStandings(); renderApplyForm();
     $('secSeason').classList.remove('hidden');
-    $('seasonSel').addEventListener('change', e => { state.selectedSeasonId = e.target.value; renderStandings(); });
+    $('feedSeasonSel').addEventListener('change', e => { state.feedSeasonId = e.target.value; state.feedPage = 0; renderFeed(); });
     $('tabSeason').addEventListener('click', () => switchTab('tabSeason'));
     $('tabAnnual').addEventListener('click', () => switchTab('tabAnnual'));
     $('tabCriteria').addEventListener('click', () => switchTab('tabCriteria'));
