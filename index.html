@@ -270,21 +270,21 @@
   <section id="secApply" class="hidden">
     <div class="banner"><span class="tri">▶▶</span>ポイント申請<span class="tri">◀◀</span></div>
 
-    <!-- 未ログイン: 氏名を選んでログイン（メール不要） -->
+    <!-- 未ログイン: 氏名を選んでログイン（申請権限者のみ） -->
     <div id="applyLogin" class="card hidden">
-      <div class="muted">ポイント申請には、メンバー名簿に登録されたご自身の氏名を選んでください。</div>
+      <div class="muted">ポイント申請には、申請権限のあるご自身の氏名を選んでください。</div>
       <label for="lgName">お名前</label>
       <select id="lgName"><option value="">氏名を選択</option></select>
       <button class="btn" id="lgBtn">ログイン</button>
       <div id="lgMsg" class="msg"></div>
     </div>
 
-    <!-- メンバー未登録 -->
+    <!-- 申請権限なし -->
     <div id="applyDenied" class="card hidden">
       <div class="blackout">
-        <div class="big">🔒 メンバー登録がありません</div>
-        <p><span id="deniedEmail"></span> はメンバー名簿に登録されていません。</p>
-        <p>運営（管理者）にメンバー登録を依頼してください。</p>
+        <div class="big">🔒 申請権限がありません</div>
+        <p><span id="deniedEmail"></span> にはポイント申請の権限が付与されていません。</p>
+        <p>運営（管理者）に権限付与を依頼してください。</p>
       </div>
       <button class="btn" id="denyLogout" style="background:linear-gradient(90deg,#4a5a7e,#6c7a99)">氏名を選び直す</button>
     </div>
@@ -619,11 +619,11 @@ function loadSession() {
 function saveSession(s) { loginSession = s; try { localStorage.setItem(LOGIN_KEY, JSON.stringify(s)); } catch {} }
 function clearSession() { loginSession = null; try { localStorage.removeItem(LOGIN_KEY); } catch {} }
 
-// ログイン画面の氏名プルダウンを名簿から生成
+// ログイン画面の氏名プルダウンを名簿から生成（申請権限のある人のみ）
 async function populateLoginNames() {
   try {
-    const { data } = await sb.from('l1_member_names').select('name,is_active').order('name');
-    const names = [...new Set((data || []).filter(r => r.is_active !== false).map(r => r.name).filter(Boolean))];
+    const { data } = await sb.from('l1_member_names').select('name,is_active,can_apply').order('name');
+    const names = [...new Set((data || []).filter(r => r.is_active !== false && r.can_apply === true).map(r => r.name).filter(Boolean))];
     const sel = $('lgName');
     if (sel) sel.innerHTML = '<option value="">氏名を選択</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
   } catch { /* 取得失敗時は空のまま */ }
@@ -639,10 +639,10 @@ async function refreshAdminLink() {
 async function refreshApplyGate() {
   const s = loadSession();
   if (!s || !s.name) { await populateLoginNames(); applyView('login'); return; }
-  // 有効メンバーか再確認（名簿から外れていたら再ログインへ）
-  let member = false;
-  try { const { data } = await sb.rpc('l1_is_member_name', { p_name: s.name }); member = !!data; } catch { member = false; }
-  if (!member) { clearSession(); await populateLoginNames(); applyView('login'); return; }
+  // 申請権限のある人か再確認（権限が外れていたら再ログインへ）
+  let allowed = false;
+  try { const { data } = await sb.rpc('l1_can_apply_name', { p_name: s.name }); allowed = !!data; } catch { allowed = false; }
+  if (!allowed) { clearSession(); await populateLoginNames(); applyView('login'); return; }
   $('whoami').textContent = s.name;
   applyView('form');
   await loadMembersIntoForm();
@@ -653,7 +653,7 @@ async function applyLogin() {
   if (!name) { msg.className='msg ngmsg'; msg.textContent='お名前を選択してください'; return; }
   $('lgBtn').disabled = true;
   let ok = false, failed = false;
-  try { const { data, error } = await sb.rpc('l1_is_member_name', { p_name: name }); if (error) failed = true; else ok = !!data; }
+  try { const { data, error } = await sb.rpc('l1_can_apply_name', { p_name: name }); if (error) failed = true; else ok = !!data; }
   catch { failed = true; }
   $('lgBtn').disabled = false;
   if (failed) { msg.className='msg ngmsg'; msg.textContent='ログイン処理でエラーが発生しました。時間をおいて再度お試しください。'; return; }
