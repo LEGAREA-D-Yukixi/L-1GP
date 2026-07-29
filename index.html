@@ -169,11 +169,15 @@
   .feeditem .ftext { min-width:0; }
   .feeditem .date { color:var(--muted); margin-right:8px; font-variant-numeric:tabular-nums; }
   .feeditem .fpt { font-weight:900; font-size:18px; white-space:nowrap; }
-  .pager { display:flex; align-items:center; justify-content:center; gap:14px; margin-top:12px; }
-  .pager .pgbtn { background:rgba(10,24,56,.9); color:var(--cyan-soft); border:1px solid var(--line-soft); border-radius:9px; padding:8px 14px; font-weight:800; font-size:14px; cursor:pointer; }
-  .pager .pgbtn:hover:not(:disabled) { border-color:var(--cyan); }
-  .pager .pgbtn:disabled { opacity:.4; cursor:default; }
-  .pager .pginfo { color:var(--muted); font-size:14px; }
+  .pager { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:16px; flex-wrap:wrap; }
+  .pager .pgnum, .pager .pgnav {
+    min-width:38px; height:38px; padding:0 10px; display:inline-flex; align-items:center; justify-content:center;
+    background:rgba(10,24,56,.9); color:var(--cyan-soft); border:1px solid var(--line-soft); border-radius:9px;
+    font-weight:800; font-size:15px; cursor:pointer; transition:.15s; }
+  .pager .pgnum:hover:not(.active), .pager .pgnav:hover:not(:disabled) { border-color:var(--cyan); color:#eaf6ff; }
+  .pager .pgnum.active { background:linear-gradient(180deg,var(--cyan),#1b8fd6); color:#06122e; border-color:var(--cyan); box-shadow:0 0 14px rgba(53,200,255,.45); cursor:default; }
+  .pager .pgnav:disabled { opacity:.35; cursor:default; }
+  .pager .pgellipsis { color:var(--muted); padding:0 4px; font-weight:800; }
   .add { color:var(--add); font-weight:800; }
   .deduct { color:var(--deduct); font-weight:800; }
   .muted { color:var(--muted); font-size:12px; }
@@ -408,7 +412,19 @@ function renderStandings() {
 }
 
 // ポイント増減履歴（全期間を新しい順にページング）
-const FEED_PAGE_SIZE = 30;
+const FEED_PAGE_SIZE = 10;
+function feedPageList(cur, pages) {
+  // 表示するページ番号（1始まり）。多い場合は … で省略。cur/pagesは1始まり
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const set = new Set([1, 2, pages - 1, pages, cur - 1, cur, cur + 1]);
+  const nums = [...set].filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
+  const out = [];
+  for (let i = 0; i < nums.length; i++) {
+    if (i > 0 && nums[i] - nums[i - 1] > 1) out.push('…');
+    out.push(nums[i]);
+  }
+  return out;
+}
 function renderFeed() {
   const feed = buildFeed({ events:state.events, divisions:state.divisions, rules:state.rules, limit:100000 });
   const pages = Math.max(1, Math.ceil(feed.length / FEED_PAGE_SIZE));
@@ -421,13 +437,22 @@ function renderFeed() {
         <div class="left">${iconImg(f.category,'fi')}<span class="ftext"><span class="date">${esc(f.occurred_on)}</span><b>${esc(f.division_name)}</b>　${esc(f.category)}<span class="muted">（${esc(f.label)}）</span></span></div>
         <div class="fpt ${f.kind === 'add' ? 'add' : 'deduct'}">${esc(f.points_label)} L</div>
       </div>`).join('');
-  if (feed.length <= FEED_PAGE_SIZE) { $('feedPager').innerHTML = ''; return; }
-  $('feedPager').innerHTML = `
-    <button class="pgbtn" id="feedPrev" ${state.feedPage === 0 ? 'disabled' : ''}>← 新しい</button>
-    <span class="pginfo">${state.feedPage + 1} / ${pages}ページ（全${feed.length}件）</span>
-    <button class="pgbtn" id="feedNext" ${state.feedPage >= pages - 1 ? 'disabled' : ''}>古い →</button>`;
-  $('feedPrev')?.addEventListener('click', () => { state.feedPage--; renderFeed(); });
-  $('feedNext')?.addEventListener('click', () => { state.feedPage++; renderFeed(); });
+  // 番号ページャ（中央下部）
+  if (pages <= 1) { $('feedPager').innerHTML = ''; return; }
+  const cur = state.feedPage + 1;
+  const items = feedPageList(cur, pages).map(n =>
+    n === '…'
+      ? '<span class="pgellipsis">…</span>'
+      : `<button class="pgnum${n === cur ? ' active' : ''}" data-pg="${n}">${n}</button>`
+  ).join('');
+  $('feedPager').innerHTML =
+    `<button class="pgnav" data-pg="${cur - 1}" ${cur === 1 ? 'disabled' : ''} aria-label="前へ">‹</button>` +
+    items +
+    `<button class="pgnav" data-pg="${cur + 1}" ${cur === pages ? 'disabled' : ''} aria-label="次へ">›</button>`;
+  $('feedPager').querySelectorAll('[data-pg]').forEach(b => b.addEventListener('click', () => {
+    const n = parseInt(b.dataset.pg, 10);
+    if (!Number.isNaN(n) && n >= 1 && n <= pages) { state.feedPage = n - 1; renderFeed(); }
+  }));
 }
 
 function renderAnnual() {
@@ -559,7 +584,7 @@ function switchTab(tab) {
   if (tab === 'tabApply') refreshApplyGate();
 }
 
-// 都市スカイライン生成（ビルは静止、窓と赤灯は個別にランダム点滅）
+// 都市スカイライン生成（多層の奥行き・立体シェーディング・屋上構造・ネオン発光。窓と赤灯は個別ランダム点滅）
 function buildSkyline() {
   const host = $('skyline');
   if (!host) return;
@@ -570,50 +595,133 @@ function buildSkyline() {
   const svg = document.createElementNS(svgNS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svg.setAttribute('preserveAspectRatio', 'xMidYMax slice');
-  // グラデ定義
-  const defs = document.createElementNS(svgNS, 'defs');
-  defs.innerHTML = `<linearGradient id="bldgGrad" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0" stop-color="#164a8e"/><stop offset="0.5" stop-color="#0f2f60"/><stop offset="1" stop-color="#081b3c"/></linearGradient>`;
-  svg.appendChild(defs);
   const mk = (tag, attrs) => { const e = document.createElementNS(svgNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
-  const gBack = mk('g', {}), gFront = mk('g', {}), gWin = mk('g', {}), gTop = mk('g', {}), gLamp = mk('g', {});
 
-  // 奥のビル列（暗色・静止）
-  let x = -10;
-  while (x < W + 10) { const w = ri(26, 60), h = ri(60, 150); gBack.appendChild(mk('rect', { x, y: H - h, width: w, height: h, rx: 2, fill: '#0a1d40' })); x += w + ri(6, 16); }
-  // 手前のビル列＋窓＋赤灯
-  x = -10;
-  while (x < W + 10) {
-    const w = ri(30, 64), h = ri(80, 190), y = H - h;
-    gFront.appendChild(mk('rect', { x, y, width: w, height: h, rx: 2, fill: 'url(#bldgGrad)' }));
-    gTop.appendChild(mk('rect', { x, y, width: w, height: 2, fill: '#59e0ff', opacity: 0.5 }));
-    // 窓（個別ランダム点滅）
-    const ww = 4, hh = 6, sx = 12, sy = 13;
-    for (let cx = x + 6; cx + ww < x + w - 5; cx += sx) {
-      for (let cy = y + 8; cy + hh < H - 6; cy += sy) {
-        if (Math.random() < 0.55) {
-          const amber = Math.random() < 0.35;
-          const rect = mk('rect', { x: cx, y: cy, width: ww, height: hh, fill: amber ? '#ffd98a' : '#7fd6ff' });
-          rect.setAttribute('class', 'w');
-          rect.style.animationDuration = rnd(2.4, 6.5).toFixed(2) + 's';
-          rect.style.animationDelay = rnd(0, 6).toFixed(2) + 's';
-          gWin.appendChild(rect);
-        }
-      }
+  // グラデ定義（層ごとに大気遠近＋立体感）
+  const defs = document.createElementNS(svgNS, 'defs');
+  defs.innerHTML = `
+    <linearGradient id="bldgFar"  x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14315f"/><stop offset="1" stop-color="#0b1e42"/></linearGradient>
+    <linearGradient id="bldgMid"  x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#173a70"/><stop offset="1" stop-color="#0a1c40"/></linearGradient>
+    <linearGradient id="bldgNear" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f4e93"/><stop offset="0.5" stop-color="#123163"/><stop offset="1" stop-color="#070f26"/></linearGradient>
+    <linearGradient id="shaft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#59e0ff" stop-opacity="0"/><stop offset="1" stop-color="#59e0ff" stop-opacity="0.16"/></linearGradient>`;
+  svg.appendChild(defs);
+
+  const gFar = mk('g', { opacity: '0.55' }), gMid = mk('g', { opacity: '0.85' }), gNear = mk('g', {}), gFx = mk('g', {});
+
+  // 窓を1つ追加（薄いグロー＋点滅する明るいコア）
+  const addWin = (g, cx, cy, w, h, amber) => {
+    const col = amber ? '#ffd98a' : '#7fd6ff';
+    if (Math.random() < 0.22) { // 一部の窓はにじむ光
+      g.appendChild(mk('rect', { x: cx - 1.5, y: cy - 1.5, width: w + 3, height: h + 3, rx: 1.5, fill: col, opacity: 0.16 }));
     }
-    // 赤灯（一部のビル・ランダム点滅）
-    if (Math.random() < 0.32) {
-      const mx = x + w / 2;
-      gLamp.appendChild(mk('rect', { x: mx - 1, y: y - 14, width: 2, height: 14, fill: '#0a1d40' }));
-      const glow = mk('circle', { cx: mx, cy: y - 16, r: 4.5, fill: '#ff5a6e', opacity: 0.35 });
-      const dot = mk('circle', { cx: mx, cy: y - 16, r: 2.4, fill: '#ff5a6e' });
+    const rect = mk('rect', { x: cx, y: cy, width: w, height: h, rx: 0.6, fill: col });
+    rect.setAttribute('class', 'w');
+    rect.style.animationDuration = rnd(2.4, 6.5).toFixed(2) + 's';
+    rect.style.animationDelay = rnd(0, 6).toFixed(2) + 's';
+    g.appendChild(rect);
+  };
+
+  // 屋上構造物（多彩）
+  const addRoof = (g, x, y, w) => {
+    const mx = x + w / 2;
+    const kind = ri(0, 4);
+    if (kind === 0) { // アンテナ＋赤灯（点滅）
+      g.appendChild(mk('rect', { x: mx - 1, y: y - ri(14, 26), width: 2, height: ri(14, 26), fill: '#0a1d40' }));
+      const ty = y - ri(16, 28);
+      const glow = mk('circle', { cx: mx, cy: ty, r: 4.5, fill: '#ff5a6e', opacity: 0.35 });
+      const dot = mk('circle', { cx: mx, cy: ty, r: 2.4, fill: '#ff5a6e' });
       const dur = rnd(1.1, 3.2).toFixed(2) + 's', del = rnd(0, 3).toFixed(2) + 's';
       for (const c of [glow, dot]) { c.setAttribute('class', 'lamp'); c.style.animationDuration = dur; c.style.animationDelay = del; }
-      gLamp.appendChild(glow); gLamp.appendChild(dot);
+      g.append(glow, dot);
+    } else if (kind === 1) { // スパイア（尖塔）
+      const tip = y - ri(18, 34);
+      g.appendChild(mk('polygon', { points: `${mx - 4},${y} ${mx + 4},${y} ${mx},${tip}`, fill: '#0d244c' }));
+      g.appendChild(mk('circle', { cx: mx, cy: tip, r: 1.8, fill: '#bfeaff', opacity: 0.9 }));
+    } else if (kind === 2) { // 給水塔
+      const tw = ri(10, 16), th = ri(8, 12);
+      g.appendChild(mk('rect', { x: mx - tw / 2, y: y - th - 6, width: tw, height: th, rx: 2, fill: '#12305f' }));
+      g.appendChild(mk('rect', { x: mx - tw / 2 + 1, y: y - 6, width: 2, height: 6, fill: '#0a1d40' }));
+      g.appendChild(mk('rect', { x: mx + tw / 2 - 3, y: y - 6, width: 2, height: 6, fill: '#0a1d40' }));
+    } else { // パラペット（縁取り）
+      g.appendChild(mk('rect', { x: x - 2, y: y - 3, width: w + 4, height: 3, fill: '#1a3f79' }));
     }
-    x += w + ri(10, 22);
+  };
+
+  // 手前の1棟（段差セットバック・立体シェーディング・窓・屋上）
+  const addNear = (x, w) => {
+    const baseY = H;
+    const top = H - ri(96, 200);
+    const segs = [];
+    // 上に向かって段差（セットバック）を0〜2段
+    const stepN = ri(0, 2);
+    let curX = x, curW = w, curTop = top;
+    segs.push({ x: curX, w: curW, top: curTop, bottom: baseY });
+    for (let s = 0; s < stepN; s++) {
+      const shrink = ri(6, 16);
+      curX += shrink; curW -= shrink * 2; if (curW < 16) break;
+      const lift = ri(14, 34);
+      const newTop = curTop - lift;
+      segs[segs.length - 1].top = curTop;
+      segs.push({ x: curX, w: curW, top: newTop, bottom: curTop });
+      curTop = newTop;
+    }
+    // 本体を下から順に描画
+    for (const sg of segs) {
+      const h = sg.bottom - sg.top;
+      gNear.appendChild(mk('rect', { x: sg.x, y: sg.top, width: sg.w, height: h, rx: 2, fill: 'url(#bldgNear)' }));
+      // 立体：左に明るいエッジ、右に陰
+      gNear.appendChild(mk('rect', { x: sg.x, y: sg.top, width: 2.5, height: h, fill: '#66c6ff', opacity: 0.5 }));
+      gNear.appendChild(mk('rect', { x: sg.x + sg.w - 2.5, y: sg.top, width: 2.5, height: h, fill: '#000', opacity: 0.32 }));
+      // 上辺ハイライト
+      gNear.appendChild(mk('rect', { x: sg.x, y: sg.top, width: sg.w, height: 2, fill: '#7fe3ff', opacity: 0.6 }));
+      // 窓（フロア帯＋個別窓の混在）
+      const ww = ri(4, 6), hh = 6, sx = ww + ri(7, 10), sy = 13;
+      for (let cy = sg.top + 9; cy + hh < sg.bottom - 5; cy += sy) {
+        if (Math.random() < 0.10) { // フロアまるごと点灯（帯）
+          const amber = Math.random() < 0.3;
+          const band = mk('rect', { x: sg.x + 5, y: cy, width: sg.w - 10, height: hh, rx: 1, fill: amber ? '#ffd98a' : '#8fdcff', opacity: 0.9 });
+          band.setAttribute('class', 'w');
+          band.style.animationDuration = rnd(3.5, 7).toFixed(2) + 's';
+          band.style.animationDelay = rnd(0, 6).toFixed(2) + 's';
+          gNear.appendChild(band);
+        } else {
+          for (let cx = sg.x + 6; cx + ww < sg.x + sg.w - 5; cx += sx) {
+            if (Math.random() < 0.5) addWin(gNear, cx, cy, ww, hh, Math.random() < 0.35);
+          }
+        }
+      }
+      addRoof(gNear, sg.x, sg.top, sg.w);
+    }
+  };
+
+  // 奥の層（大気遠近でぼんやり）
+  let x = -12;
+  while (x < W + 12) { const w = ri(24, 54), h = ri(48, 120); gFar.appendChild(mk('rect', { x, y: H - h, width: w, height: h, rx: 1.5, fill: 'url(#bldgFar)' })); x += w + ri(4, 12); }
+  // 中間層（少しだけ窓）
+  x = -14;
+  while (x < W + 14) {
+    const w = ri(30, 58), h = ri(70, 150), y = H - h;
+    gMid.appendChild(mk('rect', { x, y, width: w, height: h, rx: 2, fill: 'url(#bldgMid)' }));
+    gMid.appendChild(mk('rect', { x, y, width: w, height: 1.5, fill: '#3aa6e0', opacity: 0.5 }));
+    const ww = 4, hh = 5, sx = 13, sy = 15;
+    for (let cx = x + 6; cx + ww < x + w - 5; cx += sx)
+      for (let cy = y + 10; cy + hh < H - 6; cy += sy)
+        if (Math.random() < 0.28) addWin(gMid, cx, cy, ww, hh, Math.random() < 0.3);
+    x += w + ri(12, 24);
   }
-  svg.append(gBack, gFront, gWin, gTop, gLamp);
+  // 手前の層（主役・立体的）
+  x = -16;
+  while (x < W + 16) { const w = ri(46, 96); addNear(x, w); x += w + ri(16, 30); }
+
+  // ネオンの光条（ビルの間から立ち上る淡い光）
+  for (let i = 0; i < 7; i++) {
+    const sx = ri(40, W - 40), sw = ri(20, 46), sh = ri(70, 150);
+    gFx.appendChild(mk('rect', { x: sx, y: H - sh, width: sw, height: sh, fill: 'url(#shaft)', opacity: 0.5 }));
+  }
+  // 地表のネオンライン
+  gFx.appendChild(mk('rect', { x: 0, y: H - 3, width: W, height: 3, fill: '#59e0ff', opacity: 0.3 }));
+
+  svg.append(gFar, gMid, gFx, gNear);
   host.appendChild(svg);
 }
 
