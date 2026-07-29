@@ -76,7 +76,6 @@
       <button data-tab="tabReq" class="active">申請承認 <span id="pendingCount" class="badge"></span></button>
       <button data-tab="tabDirect">直接登録</button>
       <button data-tab="tabEvents">申請履歴</button>
-      <button data-tab="tabStandings">順位（常時表示）</button>
       <button data-tab="tabIndividual" id="tabIndividualBtn" class="hidden">個人成績</button>
       <button data-tab="tabMaster">マスタ</button>
       <button data-tab="tabAdmins">管理者</button>
@@ -120,19 +119,9 @@
 
     <!-- 個人成績 -->
     <section id="tabIndividual" class="card hidden">
-      <h2>個人成績ランキング（ポイント獲得者別）</h2>
-      <div class="row" style="align-items:flex-end">
-        <div><label>集計対象</label><select id="indScope"></select></div>
-      </div>
+      <h2>個人成績ランキング（登録メンバー別）</h2>
+      <div class="muted" style="margin-bottom:8px">メンバー名簿に登録されている人を、獲得ポイントの合計でランキング表示します。</div>
       <div id="indBody" style="margin-top:12px"></div>
-    </section>
-
-    <!-- 順位 -->
-    <section id="tabStandings" class="card hidden">
-      <h2>順位（非公開期間中も管理者は閲覧可）</h2>
-      <label>シーズン</label><select id="stSeason" style="max-width:280px"></select>
-      <div id="stBody" style="margin-top:10px"></div>
-      <div id="stAnnual" style="margin-top:16px"></div>
     </section>
 
     <!-- マスタ -->
@@ -169,10 +158,9 @@
       <h2>管理者一覧</h2>
       <div id="admBody"></div>
       <div class="row" style="margin-top:10px; align-items:flex-end">
-        <div><label>追加する管理者のメール（Authに登録済みであること）</label><input id="newAdmEmail" type="email"></div>
+        <div><label>追加する管理者のメール</label><input id="newAdmEmail" type="email"></div>
         <div style="flex:0"><button class="btn sm" id="newAdmBtn">追加</button></div>
       </div>
-      <div class="muted" style="margin-top:8px">※ 先にDashboard &gt; Authentication &gt; Users でユーザーを作成してください。</div>
     </section>
 
     <!-- 申請者 -->
@@ -273,9 +261,9 @@ async function reloadAll() {
   renderAll();
 }
 function renderAll() {
-  renderRequests(); renderDirectForm(); renderEvents(); renderStandings();
+  renderRequests(); renderDirectForm(); renderEvents();
   renderMasters(); renderAdmins(); renderApplicants(); renderMembers();
-  if (state.canIndividual) renderIndividualControls();
+  if (state.canIndividual) renderIndividual();
 }
 const dName = id => state.divisions.find(d => d.id === id)?.name ?? '(不明)';
 const rOf = id => state.rules.find(r => r.id === id);
@@ -389,22 +377,6 @@ async function voidEvent(id) {
   if (error) { gmsg(false, '打消しに失敗: ' + error.message); return; }
   gmsg(true, '打消しました（集計から除外されます）');
   await reloadAll();
-}
-
-// ---------- 順位（管理者は常時表示） ----------
-function renderStandings() {
-  const active = state.seasons.find(s => s.is_active) ?? state.seasons.at(-1);
-  if ($('stSeason').options.length === 0) seasonOptions($('stSeason'), active?.id);
-  const sid = $('stSeason').value || active?.id;
-  const season = state.seasons.find(s => s.id === sid);
-  if (!season) { $('stBody').innerHTML = '<div class="muted">シーズンがありません。</div>'; return; }
-  const eventsBySeason = new Map(state.seasons.map(s => [s.id, state.events.filter(e => e.season_id === s.id)]));
-  const rows = calcStandingsCarry({ season, seasons: state.seasons, divisions: state.divisions.filter(d=>d.is_active!==false), eventsBySeason });
-  const table = rs => `<table><thead><tr><th>順位</th><th>Division</th><th style="text-align:right">L-Point</th></tr></thead><tbody>` +
-    rs.map(r => `<tr><td class="${r.rank === 1 ? 'rank1' : ''}">${r.rank}</td><td>${esc(r.name)}</td><td style="text-align:right;font-weight:700">${r.points.toLocaleString()} L</td></tr>`).join('') + '</tbody></table>';
-  $('stBody').innerHTML = table(rows);
-  const annual = calcAnnualStandings({ cycle: season.cycle, seasons: state.seasons, divisions: state.divisions.filter(d=>d.is_active!==false), eventsBySeason });
-  $('stAnnual').innerHTML = `<h2>年間集計 ${esc(season.cycle)}</h2>` + table(annual);
 }
 
 // ---------- マスタ ----------
@@ -537,36 +509,38 @@ async function deleteRule(id) {
   await reloadAll();
 }
 
-// ---------- 個人成績（専用権限のみ） ----------
-function renderIndividualControls() {
-  const opts = ['<option value="">（現在のシーズン）</option>']
-    .concat(state.seasons.slice().reverse().map(s => `<option value="season:${s.id}">${esc(s.name)}</option>`));
-  // 年間（cycle）単位も選べるように
-  const cycles = [...new Set(state.seasons.map(s => s.cycle))];
-  for (const c of cycles) opts.push(`<option value="cycle:${esc(c)}">年間：${esc(c)}</option>`);
-  $('indScope').innerHTML = opts.join('');
-  $('indScope').onchange = loadIndividual;
-  loadIndividual();
-}
-async function loadIndividual() {
-  const val = $('indScope').value;
-  let args = {};
-  if (val.startsWith('season:')) args = { p_season_id: val.slice(7) };
-  else if (val.startsWith('cycle:')) args = { p_cycle: val.slice(6) };
-  else {
-    const active = state.seasons.find(s => s.is_active) || state.seasons.at(-1);
-    args = active ? { p_season_id: active.id } : {};
+// ---------- 個人成績（登録メンバーをランキング表示・専用権限者のみタブ表示） ----------
+function renderIndividual() {
+  const members = (state.members || []).filter(m => m.is_active !== false);
+  // 獲得者名でポイント集計（void除外）
+  const agg = new Map();
+  for (const e of (state.events || [])) {
+    if (e.voided_at) continue;
+    const nm = (e.earner_name || '').trim();
+    if (!nm) continue;
+    const a = agg.get(nm) || { pts: 0, cnt: 0 };
+    a.pts += (e.points || 0); a.cnt += 1; agg.set(nm, a);
   }
-  const { data, error } = await sb.rpc('l1_individual_standings', args);
-  if (error) { $('indBody').innerHTML = `<div class="msg ngmsg" style="display:block">取得に失敗: ${esc(error.message)}</div>`; return; }
-  const rows = data || [];
-  if (rows.length === 0) { $('indBody').innerHTML = '<div class="muted">対象の獲得記録がありません（申請・直接登録で「ポイント獲得者名」を入力すると集計されます）。</div>'; return; }
-  $('indBody').innerHTML = `<table><thead><tr><th>順位</th><th>獲得者</th><th style="text-align:right">合計pt</th><th style="text-align:right">件数</th></tr></thead><tbody>` +
-    rows.map((r, i) => `<tr>
-      <td style="text-align:center;font-weight:900">${i + 1}</td>
-      <td>${esc(r.earner_name)}</td>
-      <td style="text-align:right;font-weight:900">${Number(r.points).toLocaleString()} L</td>
-      <td style="text-align:right" class="muted">${r.entries}</td>
+  // 登録メンバーを基準に一覧（記録が無い人は0）
+  const rows = members.map(m => {
+    const a = agg.get(m.name) || { pts: 0, cnt: 0 };
+    return { name: m.name, division_id: m.division_id, pts: a.pts, cnt: a.cnt };
+  }).sort((a, b) => b.pts - a.pts || b.cnt - a.cnt || String(a.name).localeCompare(String(b.name), 'ja'));
+  // 競争順位（同ptは同順位）
+  const ranked = [];
+  rows.forEach((r, i) => { const rank = (i > 0 && rows[i - 1].pts === r.pts) ? ranked[i - 1].rank : i + 1; ranked.push({ ...r, rank }); });
+
+  if (ranked.length === 0) {
+    $('indBody').innerHTML = '<div class="muted">メンバー名簿に登録がありません。「メンバー」タブで登録するか、Larkから同期してください。</div>';
+    return;
+  }
+  $('indBody').innerHTML = `<table><thead><tr><th>順位</th><th>獲得者</th><th>所属</th><th style="text-align:right">合計pt</th><th style="text-align:right">件数</th></tr></thead><tbody>` +
+    ranked.map(r => `<tr>
+      <td style="text-align:center;font-weight:900" class="${r.rank === 1 ? 'rank1' : ''}">${r.rank}</td>
+      <td>${esc(r.name)}</td>
+      <td class="muted">${esc(dName(r.division_id) === '(不明)' ? '' : dName(r.division_id))}</td>
+      <td style="text-align:right;font-weight:900">${Number(r.pts).toLocaleString()} L</td>
+      <td style="text-align:right" class="muted">${r.cnt}</td>
     </tr>`).join('') + '</tbody></table>';
 }
 
@@ -576,18 +550,11 @@ function renderAdmins() {
       <tr>
         <td>${esc(a.email ?? a.user_id)}</td>
         <td class="muted">${esc((a.created_at || '').slice(0, 10))}</td>
-        <td style="text-align:center"><input type="checkbox" ${a.can_view_individual ? 'checked' : ''} data-indadm="${a.user_id}" style="width:auto"></td>
+        <td style="text-align:center">${a.can_view_individual ? '<span class="badge on">許可</span>' : '<span class="badge">なし</span>'}</td>
         <td>${a.user_id === state.user?.id ? '<span class="muted">自分</span>' : `<button class="btn sm red" data-deladm="${a.user_id}">削除</button>`}</td>
       </tr>`).join('') + '</tbody></table>'
-    + '<div class="muted" style="margin-top:6px">「個人成績の閲覧」をONにした管理者だけが、個人成績ランキングのタブを見られます。</div>';
+    + '<div class="muted" style="margin-top:6px">「個人成績の閲覧」をONにした管理者だけが個人成績ランキングのタブを見られます。この権限の付与・解除はデータベース（l1_admins.can_view_individual）でのみ変更できます。</div>';
   $('admBody').querySelectorAll('[data-deladm]').forEach(b => b.addEventListener('click', () => delAdmin(b.dataset.deladm)));
-  $('admBody').querySelectorAll('[data-indadm]').forEach(b => b.addEventListener('change', () => toggleIndividual(b.dataset.indadm, b.checked)));
-}
-async function toggleIndividual(user_id, on) {
-  const { error } = await sb.from('l1_admins').update({ can_view_individual: on }).eq('user_id', user_id);
-  if (error) { gmsg(false, '更新に失敗: ' + error.message); await reloadAll(); return; }
-  gmsg(true, `個人成績の閲覧権限を${on ? '付与' : '解除'}しました`);
-  if (user_id === state.user?.id) { state.canIndividual = on; $('tabIndividualBtn').classList.toggle('hidden', !on); }
 }
 async function addAdmin() {
   const email = $('newAdmEmail').value.trim();
@@ -702,7 +669,7 @@ async function delMember(id) {
 // ---------- タブ・初期化 ----------
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('active', x === b));
-  for (const sec of ['tabReq', 'tabDirect', 'tabEvents', 'tabStandings', 'tabIndividual', 'tabMaster', 'tabAdmins', 'tabApplicants', 'tabMembers']) {
+  for (const sec of ['tabReq', 'tabDirect', 'tabEvents', 'tabIndividual', 'tabMaster', 'tabAdmins', 'tabApplicants', 'tabMembers']) {
     $(sec).classList.toggle('hidden', sec !== b.dataset.tab);
   }
 }));
@@ -712,7 +679,6 @@ $('logoutBtn').addEventListener('click', logout);
 $('dcRule').addEventListener('change', () => $('dcPointsWrap').classList.toggle('hidden', !rOf($('dcRule').value)?.is_variable));
 $('dcSubmit').addEventListener('click', directSubmit);
 $('evSeason').addEventListener('change', renderEvents);
-$('stSeason').addEventListener('change', renderStandings);
 $('newDivBtn').addEventListener('click', addDivision);
 $('nrBtn').addEventListener('click', addRule);
 $('nrVariable').addEventListener('change', () => $('nrPointsWrap').classList.toggle('hidden', $('nrVariable').checked));
