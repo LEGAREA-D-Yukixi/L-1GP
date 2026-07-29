@@ -246,6 +246,11 @@
   <section id="secAnnual" class="hidden">
     <div class="banner"><span class="tri">▶▶▶</span><span id="annualTitle">年間集計</span><span class="tri">◀◀◀</span></div>
     <div id="annualBody"></div>
+    <div class="banner"><span class="tri">▶▶</span>ポイント増減履歴<span class="tri">◀◀</span></div>
+    <div class="card">
+      <div id="annualFeedBody"></div>
+      <div id="annualFeedPager" class="pager"></div>
+    </div>
   </section>
 
   <!-- 判定基準 -->
@@ -296,11 +301,12 @@
       </div>
       <label for="apDate">発生日</label>
       <input id="apDate" type="date">
-      <label for="apEarner">ポイント獲得者名（対象の方の氏名）</label>
+      <label for="apEarner">ポイント獲得者名</label>
+      <select id="apEarnerSel" class="hidden"><option value="">選択してください</option></select>
       <input id="apEarner" type="text" maxlength="100" placeholder="例: 山田 太郎">
       <label for="apName">申請者名</label>
       <input id="apName" type="text" maxlength="100" placeholder="氏名">
-      <label for="apNote">詳細・理由（運営のみ閲覧）</label>
+      <label for="apNote">詳細・理由</label>
       <textarea id="apNote" rows="3" maxlength="2000" placeholder="内容の補足があれば記入"></textarea>
       <button class="btn" id="apSubmit">申請する</button>
       <div id="apMsg" class="msg"></div>
@@ -408,11 +414,12 @@ function renderStandings() {
   } else {
     renderPyramid($('standingsBody'), rows, baseline);
   }
-  renderFeed();
+  renderFeed('feed');
 }
 
-// ポイント増減履歴（全期間を新しい順にページング）
+// ポイント増減履歴（全期間を新しい順にページング）。順位/年間で共通表示・独立ページング
 const FEED_PAGE_SIZE = 10;
+const feedPageState = { feed: 0, annualFeed: 0 };
 function feedPageList(cur, pages) {
   // 表示するページ番号（1始まり）。多い場合は … で省略。cur/pagesは1始まり
   if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
@@ -425,12 +432,15 @@ function feedPageList(cur, pages) {
   }
   return out;
 }
-function renderFeed() {
+function renderFeed(key = 'feed') {
+  const bodyEl = $(key + 'Body'), pagerEl = $(key + 'Pager');
+  if (!bodyEl) return;
   const feed = buildFeed({ events:state.events, divisions:state.divisions, rules:state.rules, limit:100000 });
   const pages = Math.max(1, Math.ceil(feed.length / FEED_PAGE_SIZE));
-  state.feedPage = Math.min(Math.max(0, state.feedPage), pages - 1);
-  const slice = feed.slice(state.feedPage * FEED_PAGE_SIZE, (state.feedPage + 1) * FEED_PAGE_SIZE);
-  $('feedBody').innerHTML = feed.length === 0
+  feedPageState[key] = Math.min(Math.max(0, feedPageState[key] || 0), pages - 1);
+  const page = feedPageState[key];
+  const slice = feed.slice(page * FEED_PAGE_SIZE, (page + 1) * FEED_PAGE_SIZE);
+  bodyEl.innerHTML = feed.length === 0
     ? '<div class="muted" style="padding:12px 0">まだ記録がありません。</div>'
     : slice.map(f => `
       <div class="feeditem">
@@ -438,20 +448,21 @@ function renderFeed() {
         <div class="fpt ${f.kind === 'add' ? 'add' : 'deduct'}">${esc(f.points_label)} L</div>
       </div>`).join('');
   // 番号ページャ（中央下部）
-  if (pages <= 1) { $('feedPager').innerHTML = ''; return; }
-  const cur = state.feedPage + 1;
+  if (!pagerEl) return;
+  if (pages <= 1) { pagerEl.innerHTML = ''; return; }
+  const cur = page + 1;
   const items = feedPageList(cur, pages).map(n =>
     n === '…'
       ? '<span class="pgellipsis">…</span>'
       : `<button class="pgnum${n === cur ? ' active' : ''}" data-pg="${n}">${n}</button>`
   ).join('');
-  $('feedPager').innerHTML =
+  pagerEl.innerHTML =
     `<button class="pgnav" data-pg="${cur - 1}" ${cur === 1 ? 'disabled' : ''} aria-label="前へ">‹</button>` +
     items +
     `<button class="pgnav" data-pg="${cur + 1}" ${cur === pages ? 'disabled' : ''} aria-label="次へ">›</button>`;
-  $('feedPager').querySelectorAll('[data-pg]').forEach(b => b.addEventListener('click', () => {
+  pagerEl.querySelectorAll('[data-pg]').forEach(b => b.addEventListener('click', () => {
     const n = parseInt(b.dataset.pg, 10);
-    if (!Number.isNaN(n) && n >= 1 && n <= pages) { state.feedPage = n - 1; renderFeed(); }
+    if (!Number.isNaN(n) && n >= 1 && n <= pages) { feedPageState[key] = n - 1; renderFeed(key); }
   }));
 }
 
@@ -466,13 +477,16 @@ function renderAnnual() {
       <div class="card blackout">
         <div class="big">🤫 年間王者は決起会で発表！</div>
         <p>結果発表月のため、年間集計は非公開です。</p>
+        <p>ポイントの増減は下の履歴で確認できます。</p>
       </div>`;
+    renderFeed('annualFeed');
     return;
   }
   const eventsBySeason = new Map(state.seasons.map(s => [s.id, state.events.filter(e => e.season_id === s.id)]));
   const rows = calcAnnualStandings({ cycle, seasons:state.seasons, divisions:state.divisions.filter(d=>d.is_active!==false), eventsBySeason });
   const baseline = seasonBaseline({ season, seasons:state.seasons });
   renderPyramid($('annualBody'), rows, baseline);
+  renderFeed('annualFeed');
 }
 
 function renderCriteria() {
@@ -524,13 +538,44 @@ async function submitRequest() {
   const msg = $('apMsg');
   if (!v.ok) { msg.className='msg ngmsg'; msg.textContent=v.errors.join('\n'); return; }
   $('apSubmit').disabled = true;
-  const payload = { division_id:input.division_id, rule_id:rule.id, occurred_on:input.occurred_on, requester_name:input.requester_name.trim(), earner_name:($('apEarner').value.trim() || null), note:input.note || null };
+  const earner = ($('apEarnerSel') && !$('apEarnerSel').classList.contains('hidden'))
+    ? $('apEarnerSel').value.trim()
+    : $('apEarner').value.trim();
+  const payload = { division_id:input.division_id, rule_id:rule.id, occurred_on:input.occurred_on, requester_name:input.requester_name.trim(), earner_name:(earner || null), note:input.note || null };
   if (rule.is_variable) payload.points = v.points;
   const { error } = await sb.from('l1_requests').insert(payload);
   $('apSubmit').disabled = false;
   if (error) { msg.className='msg ngmsg'; msg.textContent='申請に失敗しました: ' + error.message; return; }
   msg.className='msg okmsg'; msg.textContent='申請を受け付けました。運営の承認後にダッシュボードへ反映されます。';
-  $('apNote').value=''; $('apPoints').value=''; $('apEarner').value='';
+  $('apNote').value=''; $('apPoints').value=''; $('apEarner').value=''; if ($('apEarnerSel')) $('apEarnerSel').value='';
+}
+
+// メンバー名簿を読み込み: 申請者名の自動入力＋獲得者プルダウン
+async function loadMembersIntoForm() {
+  let names = [], myName = '';
+  try {
+    const [{ data: rows }, { data: mine }] = await Promise.all([
+      sb.from('l1_member_names').select('name,is_active').order('name'),
+      sb.rpc('l1_my_name'),
+    ]);
+    names = (rows || []).filter(r => r.is_active !== false).map(r => r.name).filter(Boolean);
+    myName = mine || '';
+  } catch { /* 名簿未整備でもフォームは動作（手入力にフォールバック） */ }
+
+  // 申請者名: 名簿に氏名があれば自動入力＆読取専用、無ければ手入力
+  const nameEl = $('apName');
+  if (myName) { nameEl.value = myName; nameEl.readOnly = true; nameEl.style.opacity = '.85'; }
+  else { nameEl.readOnly = false; nameEl.style.opacity = ''; }
+
+  // 獲得者名: 名簿があればプルダウン、無ければテキスト入力
+  const sel = $('apEarnerSel'), txt = $('apEarner');
+  if (names.length) {
+    const uniq = [...new Set(names)];
+    sel.innerHTML = '<option value="">選択してください</option>' + uniq.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    sel.classList.remove('hidden'); txt.classList.add('hidden');
+  } else {
+    sel.classList.add('hidden'); txt.classList.remove('hidden');
+  }
 }
 
 // ---------- 申請の認証・権限ゲート ----------
@@ -555,8 +600,10 @@ async function refreshApplyGate() {
   const email = session.user?.email ?? '';
   if (can) {
     $('whoami').textContent = email;
-    $('apName').value = $('apName').value || (email.split('@')[0] ?? '');
     applyView('form');
+    await loadMembersIntoForm();
+    // 名簿に無い場合の申請者名フォールバック（メールのローカル部）
+    if (!$('apName').readOnly && !$('apName').value) $('apName').value = email.split('@')[0] ?? '';
   } else {
     $('deniedEmail').textContent = email;
     applyView('denied');
