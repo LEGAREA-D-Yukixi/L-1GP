@@ -544,7 +544,16 @@ async function submitRequest() {
     : $('apEarner').value.trim();
   const payload = { division_id:input.division_id, rule_id:rule.id, occurred_on:input.occurred_on, requester_name:input.requester_name.trim(), requester_email:loginSession.email, earner_name:(earner || null), note:input.note || null };
   if (rule.is_variable) payload.points = v.points;
-  const { error } = await sb.from('l1_requests').insert(payload);
+  const { error } = await sb.rpc('l1_submit_request', {
+    p_division_id: payload.division_id,
+    p_rule_id: payload.rule_id,
+    p_occurred_on: payload.occurred_on,
+    p_requester_name: payload.requester_name,
+    p_requester_email: payload.requester_email,
+    p_earner_name: payload.earner_name,
+    p_note: payload.note,
+    p_points: (payload.points ?? null)
+  });
   $('apSubmit').disabled = false;
   if (error) { msg.className='msg ngmsg'; msg.textContent='申請に失敗しました: ' + error.message; return; }
   msg.className='msg okmsg'; msg.textContent='申請を受け付けました。運営の承認後にダッシュボードへ反映されます。';
