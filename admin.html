@@ -103,6 +103,7 @@
         <div><label>発生日</label><input id="dcDate" type="date"></div>
       </div>
       <label>ポイント獲得者名（個人成績に集計されます）</label>
+      <select id="dcEarnerSel" class="hidden"><option value="">選択してください</option></select>
       <input id="dcEarner" type="text" maxlength="100" placeholder="例: 山田 太郎">
       <label>理由・詳細（管理者のみ閲覧）</label>
       <textarea id="dcNote" rows="2" maxlength="2000"></textarea>
@@ -155,7 +156,11 @@
 
     <!-- 管理者 -->
     <section id="tabAdmins" class="card hidden">
-      <h2>管理者一覧</h2>
+      <div class="row" style="justify-content:space-between; align-items:center">
+        <h2 style="margin:0">管理者一覧</h2>
+        <button class="btn sm gray" id="admAutoLinkBtn">メールでLark自動リンク</button>
+      </div>
+      <div class="muted" style="margin:8px 0">申請の通知はLarkのDMで届きます。各管理者の「Lark通知先」を氏名で紐付けてください（メールが一致する人は「自動リンク」で一括設定できます）。未紐付けの管理者にはDMが届きません。</div>
       <div id="admBody"></div>
       <div class="row" style="margin-top:10px; align-items:flex-end">
         <div><label>追加する管理者のメール</label><input id="newAdmEmail" type="email"></div>
@@ -324,6 +329,20 @@ function renderDirectForm() {
     `<optgroup label="加点">${g.add.map(opt).join('')}</optgroup>` +
     `<optgroup label="減点">${g.deduct.map(opt).join('')}</optgroup>`;
   if (!$('dcDate').value) $('dcDate').value = todayISO();
+
+  // 獲得者名: 名簿（Lark同期）があればプルダウン、無ければテキスト入力（集計のばらつき防止）
+  const sel = $('dcEarnerSel'), txt = $('dcEarner');
+  const names = [...new Set((state.members || [])
+    .filter(m => m.is_active !== false).map(m => m.name).filter(Boolean))];
+  if (names.length) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">選択してください</option>' +
+      names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    if (names.includes(cur)) sel.value = cur;
+    sel.classList.remove('hidden'); txt.classList.add('hidden');
+  } else {
+    sel.classList.add('hidden'); txt.classList.remove('hidden');
+  }
 }
 async function directSubmit() {
   const rule = rOf($('dcRule').value) || null;
@@ -333,15 +352,18 @@ async function directSubmit() {
   const season = seasonForDate(state.seasons, input.occurred_on);
   if (!season) { flash($('dcMsg'), false, '発生日をカバーするシーズンがありません。シーズンタブで追加してください。'); return; }
   $('dcSubmit').disabled = true;
+  const earner = ($('dcEarnerSel') && !$('dcEarnerSel').classList.contains('hidden'))
+    ? $('dcEarnerSel').value.trim()
+    : $('dcEarner').value.trim();
   const { error } = await sb.from('l1_events').insert({
     season_id: season.id, division_id: input.division_id, rule_id: rule.id,
     points: v.points, occurred_on: input.occurred_on, note: input.note || null,
-    earner_name: $('dcEarner').value.trim() || null,
+    earner_name: earner || null,
   });
   $('dcSubmit').disabled = false;
   if (error) { flash($('dcMsg'), false, '登録に失敗: ' + error.message); return; }
   flash($('dcMsg'), true, '登録しました（ダッシュボードへ即時反映）');
-  $('dcNote').value = ''; $('dcPoints').value = ''; $('dcEarner').value = '';
+  $('dcNote').value = ''; $('dcPoints').value = ''; $('dcEarner').value = ''; if ($('dcEarnerSel')) $('dcEarnerSel').value = '';
   await reloadAll();
 }
 
@@ -544,17 +566,47 @@ function renderIndividual() {
     </tr>`).join('') + '</tbody></table>';
 }
 
+function memberNameOptions(selectedName) {
+  const names = [...new Set((state.members || []).filter(m => m.is_active !== false && m.open_id).map(m => m.name))].sort((a, b) => String(a).localeCompare(String(b), 'ja'));
+  return '<option value="">（未設定）</option>' +
+    names.map(n => `<option value="${esc(n)}" ${n === selectedName ? 'selected' : ''}>${esc(n)}</option>`).join('');
+}
 function renderAdmins() {
-  $('admBody').innerHTML = `<table><thead><tr><th>メール</th><th>登録日</th><th style="text-align:center">個人成績の閲覧</th><th></th></tr></thead><tbody>` +
+  $('admBody').innerHTML = `<table><thead><tr><th>メール</th><th>Lark通知先（氏名）</th><th style="text-align:center">個人成績の閲覧</th><th></th></tr></thead><tbody>` +
     state.admins.map(a => `
       <tr>
-        <td>${esc(a.email ?? a.user_id)}</td>
-        <td class="muted">${esc((a.created_at || '').slice(0, 10))}</td>
+        <td>${esc(a.email ?? a.user_id)}<div class="muted" style="font-size:11px">${esc((a.created_at || '').slice(0, 10))}</div></td>
+        <td>
+          <select id="al-${a.user_id}" style="min-width:150px">${memberNameOptions(a.lark_name)}</select>
+          ${a.open_id ? '<span class="badge on" style="margin-left:6px">紐付け済</span>' : '<span class="badge" style="margin-left:6px">未紐付け</span>'}
+        </td>
         <td style="text-align:center">${a.can_view_individual ? '<span class="badge on">許可</span>' : '<span class="badge">なし</span>'}</td>
-        <td>${a.user_id === state.user?.id ? '<span class="muted">自分</span>' : `<button class="btn sm red" data-deladm="${a.user_id}">削除</button>`}</td>
+        <td style="white-space:nowrap">
+          <button class="btn sm gray" data-savelark="${a.user_id}">保存</button>
+          ${a.user_id === state.user?.id ? '<span class="muted">自分</span>' : `<button class="btn sm red" data-deladm="${a.user_id}">削除</button>`}
+        </td>
       </tr>`).join('') + '</tbody></table>'
-    + '<div class="muted" style="margin-top:6px">「個人成績の閲覧」をONにした管理者だけが個人成績ランキングのタブを見られます。この権限の付与・解除はデータベース（l1_admins.can_view_individual）でのみ変更できます。</div>';
+    + '<div class="muted" style="margin-top:6px">Lark通知先は「メンバー名簿」の氏名から選びます（Lark同期で open_id が入っている人が対象）。個人成績の閲覧権限の付与・解除はデータベース（l1_admins.can_view_individual）でのみ変更できます。</div>';
   $('admBody').querySelectorAll('[data-deladm]').forEach(b => b.addEventListener('click', () => delAdmin(b.dataset.deladm)));
+  $('admBody').querySelectorAll('[data-savelark]').forEach(b => b.addEventListener('click', () => saveAdminLark(b.dataset.savelark)));
+}
+async function saveAdminLark(user_id) {
+  const name = $(`al-${user_id}`).value;
+  const m = (state.members || []).find(x => x.name === name && x.open_id);
+  const open_id = m ? m.open_id : null;
+  const lark_name = name || null;
+  const { error } = await sb.from('l1_admins').update({ open_id, lark_name }).eq('user_id', user_id);
+  if (error) { gmsg(false, 'Lark通知先の保存に失敗: ' + error.message); return; }
+  gmsg(true, open_id ? `Lark通知先を「${name}」に設定しました` : 'Lark通知先を未設定にしました');
+  await reloadAll();
+}
+async function autoLinkAdmins() {
+  $('admAutoLinkBtn').disabled = true;
+  const { data, error } = await sb.rpc('l1_link_admins_open_id');
+  $('admAutoLinkBtn').disabled = false;
+  if (error) { gmsg(false, '自動リンクに失敗: ' + error.message); return; }
+  gmsg(true, `メール一致で ${data ?? 0} 件の管理者をLarkに紐付けました。残りは氏名で手動設定してください。`);
+  await reloadAll();
 }
 async function addAdmin() {
   const email = $('newAdmEmail').value.trim();
@@ -683,6 +735,7 @@ $('newDivBtn').addEventListener('click', addDivision);
 $('nrBtn').addEventListener('click', addRule);
 $('nrVariable').addEventListener('change', () => $('nrPointsWrap').classList.toggle('hidden', $('nrVariable').checked));
 $('newAdmBtn').addEventListener('click', addAdmin);
+$('admAutoLinkBtn').addEventListener('click', autoLinkAdmins);
 $('newAplBtn').addEventListener('click', addApplicant);
 $('newMemBtn').addEventListener('click', addMember);
 $('larkSyncBtn').addEventListener('click', larkSyncNow);
