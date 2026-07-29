@@ -121,7 +121,7 @@
   .medallion .mico { width:62%; height:62%; display:block; position:relative; z-index:1;
     filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.5)); }
   .medallion.mlarge .mico { width:66%; height:66%; }
-  .medallion .mnum { position:relative; z-index:1; text-shadow:0 1px 1px rgba(255,255,255,.55), 0 -1px 2px rgba(0,0,0,.4); }
+  .medallion .mnum { position:relative; z-index:1; font-style:italic; font-weight:900; letter-spacing:-.5px; text-shadow:0 1px 1px rgba(255,255,255,.55), 0 -1px 2px rgba(0,0,0,.4); }
   .m-gold{background:var(--g-gold)} .m-silver{background:var(--g-silver)} .m-bronze{background:var(--g-bronze)}
   .m-blue{background:linear-gradient(150deg,#8fd0ff,#2f7fd0,#173a7e);color:#eaf6ff;text-shadow:0 1px 2px rgba(0,0,0,.5)}
   .m-danger{background:linear-gradient(150deg,#fff2a8,#ffd400,#b39400);color:#3a2b00}
@@ -369,29 +369,46 @@ async function loadAll() {
 }
 
 /** 案3: 3D深度 逆ピラミッド + ミニ基準線ゲージ（左端0・中央1,000／数字なし） */
-// メダル内のリッチアイコン（王冠 / ドクロ）
+// メダル内のリッチアイコン（王冠 / ドクロ＋交差した骨）※画像の雰囲気に寄せたオリジナルSVG
 function crownSVG() {
   return `<svg viewBox="0 0 24 24" class="mico" aria-hidden="true">
     <defs><linearGradient id="l1CrownG" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fff6cf"/><stop offset=".5" stop-color="#ffcf3f"/><stop offset="1" stop-color="#8f6300"/></linearGradient></defs>
-    <path d="M2.8 8.2l3.4 3.1L12 4.8l5.8 6.5 3.4-3.1-1.5 9.4a1 1 0 0 1-1 .85H5.3a1 1 0 0 1-1-.85L2.8 8.2z"
-      fill="url(#l1CrownG)" stroke="#5f4200" stroke-width="1" stroke-linejoin="round"/>
-    <rect x="5" y="18.4" width="14" height="2.7" rx="1.1" fill="#c8951e" stroke="#5f4200" stroke-width=".7"/>
-    <circle cx="12" cy="10.6" r="1.6" fill="#ff5d73" stroke="#7a1020" stroke-width=".6"/>
-    <circle cx="6.1" cy="9.2" r="1.05" fill="#67d9ff" stroke="#0b4a66" stroke-width=".5"/>
-    <circle cx="17.9" cy="9.2" r="1.05" fill="#67d9ff" stroke="#0b4a66" stroke-width=".5"/>
-    <path d="M4.4 9.1 12 6 19.6 9.1" fill="none" stroke="#fff8dc" stroke-width=".8" opacity=".75"/>
+      <stop offset="0" stop-color="#fff7d2"/><stop offset=".45" stop-color="#ffcf3f"/><stop offset="1" stop-color="#8a5f00"/></linearGradient></defs>
+    <g stroke="#5f4200" stroke-width=".85" stroke-linejoin="round">
+      <path d="M2.5 8.1l3.3 3.3 2.05-4.5 1.75 3.7L12 3.6l2.4 6.9 1.75-3.7 2.05 4.5L21.5 8.1l-1.35 9.5a1 1 0 0 1-1 .86H4.85a1 1 0 0 1-1-.86L2.5 8.1z" fill="url(#l1CrownG)"/>
+      <rect x="4.4" y="18.1" width="15.2" height="3" rx="1.2" fill="#d8a021"/>
+    </g>
+    <circle cx="12" cy="10.3" r="1.75" fill="#ff5d73" stroke="#7a1020" stroke-width=".6"/>
+    <circle cx="6" cy="8.9" r="1.05" fill="#67d9ff" stroke="#0b4a66" stroke-width=".5"/>
+    <circle cx="18" cy="8.9" r="1.05" fill="#67d9ff" stroke="#0b4a66" stroke-width=".5"/>
+    <g fill="#2b5bd0" stroke="#0b2a66" stroke-width=".35">
+      <circle cx="7.6" cy="19.6" r=".6"/><circle cx="10.5" cy="19.6" r=".6"/><circle cx="13.5" cy="19.6" r=".6"/><circle cx="16.4" cy="19.6" r=".6"/>
+    </g>
+    <path d="M4.1 8.8 12 5.4 19.9 8.8" fill="none" stroke="#fff8dc" stroke-width=".7" opacity=".7"/>
   </svg>`;
 }
 function skullSVG() {
   return `<svg viewBox="0 0 24 24" class="mico" aria-hidden="true">
-    <path d="M12 2.2c5.1 0 8.2 3.4 8.2 8 0 2.6-1.1 4.1-2.4 5.2-.5.4-.7.8-.7 1.4v1.3a1.5 1.5 0 0 1-1.5 1.5h-.7v-2h-1.3v2h-1.5v-2h-1.6v2H8.8v-2H8.1v2H7.4A1.5 1.5 0 0 1 5.9 18v-1.2c0-.6-.2-1-.7-1.4C3.9 14.3 2.8 12.8 2.8 10.2c0-4.6 3.1-8 9.2-8z"
-      fill="#241a10" stroke="#000" stroke-width=".7"/>
-    <circle cx="8.4" cy="11" r="2.4" fill="#0a0a0a"/>
-    <circle cx="15.6" cy="11" r="2.4" fill="#0a0a0a"/>
-    <circle cx="8.9" cy="10.5" r=".55" fill="#ff5a5a" opacity=".85"/>
-    <circle cx="16.1" cy="10.5" r=".55" fill="#ff5a5a" opacity=".85"/>
-    <path d="M12 13.4l1.25 2.3h-2.5z" fill="#0a0a0a"/>
+    <g stroke="#0d0d0d" stroke-width=".5" stroke-linejoin="round">
+      <!-- 交差した骨（背面） -->
+      <g fill="#efece4">
+        <g transform="rotate(45 12 15.5)">
+          <rect x="4" y="14.5" width="16" height="2" rx="1"/>
+          <circle cx="4.2" cy="14.3" r="1.25"/><circle cx="4.2" cy="16.7" r="1.25"/>
+          <circle cx="19.8" cy="14.3" r="1.25"/><circle cx="19.8" cy="16.7" r="1.25"/>
+        </g>
+        <g transform="rotate(-45 12 15.5)">
+          <rect x="4" y="14.5" width="16" height="2" rx="1"/>
+          <circle cx="4.2" cy="14.3" r="1.25"/><circle cx="4.2" cy="16.7" r="1.25"/>
+          <circle cx="19.8" cy="14.3" r="1.25"/><circle cx="19.8" cy="16.7" r="1.25"/>
+        </g>
+      </g>
+      <!-- 頭蓋骨 -->
+      <path d="M12 2.6c4.4 0 7.1 2.9 7.1 6.9 0 2.2-.95 3.6-2.1 4.5-.42.34-.62.72-.62 1.25v1.05a1.35 1.35 0 0 1-1.35 1.35h-.55v-1.7h-1.15v1.7h-1.25v-1.7h-1.35v1.7H9.62v-1.7H9.07v1.7h-.55A1.35 1.35 0 0 1 7.17 16.3v-1.05c0-.53-.2-.91-.62-1.25C5.4 13.1 4.45 11.7 4.45 9.5 4.45 5.5 7.6 2.6 12 2.6z" fill="#f0ede6"/>
+      <circle cx="8.9" cy="10" r="2.05" fill="#141414"/>
+      <circle cx="15.1" cy="10" r="2.05" fill="#141414"/>
+      <path d="M12 12.1l1.05 2h-2.1z" fill="#141414"/>
+    </g>
   </svg>`;
 }
 
