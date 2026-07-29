@@ -282,7 +282,7 @@ function renderRequests() {
       const r = rOf(q.rule_id);
       const variable = !!r?.is_variable;
       return `<tr>
-        <td class="muted">${esc((q.created_at || '').slice(0, 10))}</td>
+        <td class="muted" style="white-space:nowrap">${q.created_at ? esc(new Date(q.created_at).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })) : ''}</td>
         <td>${esc(q.occurred_on)}</td>
         <td>${esc(dName(q.division_id))}</td>
         <td>${esc(r ? r.category + '｜' + r.label : '(不明)')}</td>
