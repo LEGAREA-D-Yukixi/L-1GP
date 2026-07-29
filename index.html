@@ -193,10 +193,10 @@
   #loading { color:var(--muted); padding:26px; text-align:center; }
 
     /* 都市スカイライン（JSでインラインSVG生成。窓・赤灯は個別ランダム点滅） */
-  #skyline { position:fixed; left:0; right:0; bottom:0; height:200px; z-index:0; pointer-events:none;
-    background:radial-gradient(760px 200px at 50% 118%, rgba(53,200,255,.30), transparent 72%);
-    -webkit-mask-image:linear-gradient(180deg, transparent, #000 38%);
-    mask-image:linear-gradient(180deg, transparent, #000 38%); }
+  #skyline { position:fixed; left:0; right:0; bottom:0; height:260px; z-index:0; pointer-events:none;
+    background:radial-gradient(820px 220px at 50% 96%, rgba(53,200,255,.22), transparent 72%);
+    -webkit-mask-image:linear-gradient(180deg, transparent 0, #000 20%);
+    mask-image:linear-gradient(180deg, transparent 0, #000 20%); }
   #skyline svg { position:absolute; left:0; bottom:0; width:100%; height:100%; display:block; }
   @keyframes winBlink { 0%,100%{opacity:.18} 50%{opacity:1} }
   @keyframes lampBlink { 0%,100%{opacity:.2} 50%{opacity:1} }
@@ -631,144 +631,123 @@ function switchTab(tab) {
   if (tab === 'tabApply') refreshApplyGate();
 }
 
-// 都市スカイライン生成（多層の奥行き・立体シェーディング・屋上構造・ネオン発光。窓と赤灯は個別ランダム点滅）
+// 都市スカイライン生成（ネオン・シンセウェーブ調＋水面反射。窓とビーコンは個別ランダム点滅）
 function buildSkyline() {
   const host = $('skyline');
   if (!host) return;
-  const W = 1440, H = 240;
+  const W = 1440, Hv = 300, WL = 200;   // viewBox高さ・水面ライン
   const rnd = (a, b) => a + Math.random() * (b - a);
   const ri = (a, b) => Math.floor(rnd(a, b + 1));
+  const pick = a => a[Math.floor(Math.random() * a.length)];
   const svgNS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNS, 'svg');
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('viewBox', `0 0 ${W} ${Hv}`);
   svg.setAttribute('preserveAspectRatio', 'xMidYMax slice');
   const mk = (tag, attrs) => { const e = document.createElementNS(svgNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
 
-  // グラデ定義（層ごとに大気遠近＋立体感）
   const defs = document.createElementNS(svgNS, 'defs');
   defs.innerHTML = `
-    <linearGradient id="bldgFar"  x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14315f"/><stop offset="1" stop-color="#0b1e42"/></linearGradient>
-    <linearGradient id="bldgMid"  x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#173a70"/><stop offset="1" stop-color="#0a1c40"/></linearGradient>
-    <linearGradient id="bldgNear" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f4e93"/><stop offset="0.5" stop-color="#123163"/><stop offset="1" stop-color="#070f26"/></linearGradient>
-    <linearGradient id="shaft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#59e0ff" stop-opacity="0"/><stop offset="1" stop-color="#59e0ff" stop-opacity="0.16"/></linearGradient>`;
+    <linearGradient id="refFade" gradientUnits="userSpaceOnUse" x1="0" y1="${WL}" x2="0" y2="${Hv}"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>
+    <mask id="refMask" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${Hv}"><rect x="0" y="${WL}" width="${W}" height="${Hv - WL}" fill="url(#refFade)"/></mask>`;
   svg.appendChild(defs);
 
-  const gFar = mk('g', { opacity: '0.55' }), gMid = mk('g', { opacity: '0.85' }), gNear = mk('g', {}), gFx = mk('g', {});
+  const NEON = ['#26e0ff', '#ff3bd6', '#ff7a3c', '#4dff9e', '#9b5bff', '#3b7bff', '#ffd24d', '#ff5a6e'];
+  const gCity = mk('g', {}), gFx = mk('g', {});
 
-  // 窓を1つ追加（薄いグロー＋点滅する明るいコア）
-  const addWin = (g, cx, cy, w, h, amber) => {
-    const col = amber ? '#ffd98a' : '#7fd6ff';
-    if (Math.random() < 0.22) { // 一部の窓はにじむ光
-      g.appendChild(mk('rect', { x: cx - 1.5, y: cy - 1.5, width: w + 3, height: h + 3, rx: 1.5, fill: col, opacity: 0.16 }));
-    }
-    const rect = mk('rect', { x: cx, y: cy, width: w, height: h, rx: 0.6, fill: col });
-    rect.setAttribute('class', 'w');
-    rect.style.animationDuration = rnd(2.4, 6.5).toFixed(2) + 's';
-    rect.style.animationDelay = rnd(0, 6).toFixed(2) + 's';
-    g.appendChild(rect);
-  };
-
-  // 屋上構造物（多彩）
-  const addRoof = (g, x, y, w) => {
-    const mx = x + w / 2;
-    const kind = ri(0, 4);
-    if (kind === 0) { // アンテナ＋赤灯（点滅）
-      g.appendChild(mk('rect', { x: mx - 1, y: y - ri(14, 26), width: 2, height: ri(14, 26), fill: '#0a1d40' }));
-      const ty = y - ri(16, 28);
-      const glow = mk('circle', { cx: mx, cy: ty, r: 4.5, fill: '#ff5a6e', opacity: 0.35 });
-      const dot = mk('circle', { cx: mx, cy: ty, r: 2.4, fill: '#ff5a6e' });
+  // 屋上アクセント（ネオン）
+  const roof = (g, x, top, w, hue) => {
+    const mx = x + w / 2, k = ri(0, 4);
+    if (k === 0) { // アンテナ＋ビーコン（点滅）
+      const th = ri(16, 30);
+      g.appendChild(mk('rect', { x: mx - 1, y: top - th, width: 2, height: th, fill: hue, opacity: 0.85 }));
+      const bc = pick(NEON), ty = top - th;
+      const glow = mk('circle', { cx: mx, cy: ty, r: 4, fill: bc, opacity: 0.4 });
+      const dot = mk('circle', { cx: mx, cy: ty, r: 2, fill: bc });
       const dur = rnd(1.1, 3.2).toFixed(2) + 's', del = rnd(0, 3).toFixed(2) + 's';
       for (const c of [glow, dot]) { c.setAttribute('class', 'lamp'); c.style.animationDuration = dur; c.style.animationDelay = del; }
       g.append(glow, dot);
-    } else if (kind === 1) { // スパイア（尖塔）
-      const tip = y - ri(18, 34);
-      g.appendChild(mk('polygon', { points: `${mx - 4},${y} ${mx + 4},${y} ${mx},${tip}`, fill: '#0d244c' }));
-      g.appendChild(mk('circle', { cx: mx, cy: tip, r: 1.8, fill: '#bfeaff', opacity: 0.9 }));
-    } else if (kind === 2) { // 給水塔
-      const tw = ri(10, 16), th = ri(8, 12);
-      g.appendChild(mk('rect', { x: mx - tw / 2, y: y - th - 6, width: tw, height: th, rx: 2, fill: '#12305f' }));
-      g.appendChild(mk('rect', { x: mx - tw / 2 + 1, y: y - 6, width: 2, height: 6, fill: '#0a1d40' }));
-      g.appendChild(mk('rect', { x: mx + tw / 2 - 3, y: y - 6, width: 2, height: 6, fill: '#0a1d40' }));
-    } else { // パラペット（縁取り）
-      g.appendChild(mk('rect', { x: x - 2, y: y - 3, width: w + 4, height: 3, fill: '#1a3f79' }));
+    } else if (k === 1) { // 三角アクセント（参考画像の赤三角）
+      const th = ri(16, 30);
+      g.appendChild(mk('polygon', { points: `${x + 3},${top} ${x + w - 3},${top} ${mx},${top - th}`, fill: 'none', stroke: hue, 'stroke-width': 2, opacity: 0.9 }));
+    } else if (k === 2) { // スパイア
+      const tip = top - ri(20, 40);
+      g.appendChild(mk('line', { x1: mx, y1: top, x2: mx, y2: tip, stroke: hue, 'stroke-width': 2 }));
+      g.appendChild(mk('circle', { cx: mx, cy: tip, r: 1.8, fill: '#fff', opacity: 0.9 }));
+    } else { // 段付きパラペット
+      g.appendChild(mk('rect', { x: mx - ri(6, 12), y: top - ri(5, 9), width: ri(12, 22), height: ri(5, 9), fill: '#080c1e', stroke: hue, 'stroke-width': 1.2, opacity: 0.9 }));
     }
   };
 
-  // 手前の1棟（段差セットバック・立体シェーディング・窓・屋上）
-  const addNear = (x, w) => {
-    const baseY = H;
-    const top = H - ri(96, 200);
-    const segs = [];
-    // 上に向かって段差（セットバック）を0〜2段
-    const stepN = ri(0, 2);
-    let curX = x, curW = w, curTop = top;
-    segs.push({ x: curX, w: curW, top: curTop, bottom: baseY });
-    for (let s = 0; s < stepN; s++) {
-      const shrink = ri(6, 16);
-      curX += shrink; curW -= shrink * 2; if (curW < 16) break;
-      const lift = ri(14, 34);
-      const newTop = curTop - lift;
-      segs[segs.length - 1].top = curTop;
-      segs.push({ x: curX, w: curW, top: newTop, bottom: curTop });
-      curTop = newTop;
+  // ビル1棟（暗いボディ＋ネオン輪郭＋発光窓）
+  const addBuilding = (x, w, layer) => {
+    const hue = pick(NEON);
+    const h = layer === 'front' ? ri(80, 178) : ri(46, 120);
+    const top = WL - h;
+    const op = layer === 'front' ? 1 : 0.72;
+    const g = mk('g', { opacity: op });
+    // 背後のグロー
+    g.appendChild(mk('rect', { x: x - 2, y: top - 2, width: w + 4, height: h + 4, rx: 2, fill: hue, opacity: 0.08 }));
+    // 暗いボディ
+    g.appendChild(mk('rect', { x, y: top, width: w, height: h, rx: 1.5, fill: '#080c1e' }));
+    // ネオン輪郭（左・上、時々右）
+    g.appendChild(mk('rect', { x, y: top, width: 2, height: h, fill: hue }));
+    g.appendChild(mk('rect', { x, y: top, width: w, height: 2, fill: hue }));
+    if (Math.random() < 0.5) g.appendChild(mk('rect', { x: x + w - 2, y: top, width: 2, height: h, fill: hue, opacity: 0.85 }));
+    // 横のネオン帯（数本）
+    const bands = ri(0, 3);
+    for (let i = 0; i < bands; i++) {
+      const by = top + ri(10, Math.max(11, h - 10));
+      g.appendChild(mk('rect', { x: x + 2, y: by, width: w - 4, height: 1.2, fill: hue, opacity: 0.5 }));
     }
-    // 本体を下から順に描画
-    for (const sg of segs) {
-      const h = sg.bottom - sg.top;
-      gNear.appendChild(mk('rect', { x: sg.x, y: sg.top, width: sg.w, height: h, rx: 2, fill: 'url(#bldgNear)' }));
-      // 立体：左に明るいエッジ、右に陰
-      gNear.appendChild(mk('rect', { x: sg.x, y: sg.top, width: 2.5, height: h, fill: '#66c6ff', opacity: 0.5 }));
-      gNear.appendChild(mk('rect', { x: sg.x + sg.w - 2.5, y: sg.top, width: 2.5, height: h, fill: '#000', opacity: 0.32 }));
-      // 上辺ハイライト
-      gNear.appendChild(mk('rect', { x: sg.x, y: sg.top, width: sg.w, height: 2, fill: '#7fe3ff', opacity: 0.6 }));
-      // 窓（フロア帯＋個別窓の混在）
-      const ww = ri(4, 6), hh = 6, sx = ww + ri(7, 10), sy = 13;
-      for (let cy = sg.top + 9; cy + hh < sg.bottom - 5; cy += sy) {
-        if (Math.random() < 0.10) { // フロアまるごと点灯（帯）
-          const amber = Math.random() < 0.3;
-          const band = mk('rect', { x: sg.x + 5, y: cy, width: sg.w - 10, height: hh, rx: 1, fill: amber ? '#ffd98a' : '#8fdcff', opacity: 0.9 });
-          band.setAttribute('class', 'w');
-          band.style.animationDuration = rnd(3.5, 7).toFixed(2) + 's';
-          band.style.animationDelay = rnd(0, 6).toFixed(2) + 's';
-          gNear.appendChild(band);
-        } else {
-          for (let cx = sg.x + 6; cx + ww < sg.x + sg.w - 5; cx += sx) {
-            if (Math.random() < 0.5) addWin(gNear, cx, cy, ww, hh, Math.random() < 0.35);
+    // 発光窓（ビル色。一部は点滅）
+    const ww = ri(3, 5), hh = 5, sx = ww + ri(6, 9), sy = 12;
+    for (let cy = top + 8; cy + hh < WL - 4; cy += sy) {
+      for (let cx = x + 5; cx + ww < x + w - 4; cx += sx) {
+        if (Math.random() < 0.55) {
+          const lit = Math.random();
+          const wc = lit < 0.72 ? hue : (lit < 0.88 ? '#ffffff' : '#ffd98a');
+          const rect = mk('rect', { x: cx, y: cy, width: ww, height: hh, fill: wc });
+          if (Math.random() < 0.45) {  // 個別ランダム点滅
+            rect.setAttribute('class', 'w');
+            rect.style.animationDuration = rnd(2.4, 6.5).toFixed(2) + 's';
+            rect.style.animationDelay = rnd(0, 6).toFixed(2) + 's';
+          } else {
+            rect.setAttribute('opacity', rnd(0.35, 0.85).toFixed(2));  // 常時点灯（濃淡）
           }
+          g.appendChild(rect);
         }
       }
-      addRoof(gNear, sg.x, sg.top, sg.w);
     }
+    roof(g, x, top, w, hue);
+    // サーチライトのビーム（手前の一部）
+    if (layer === 'front' && Math.random() < 0.22) {
+      const mx = x + w / 2, bh = ri(70, 150);
+      g.appendChild(mk('polygon', { points: `${mx - 4},${top} ${mx + 4},${top} ${mx + 9},${top - bh} ${mx - 9},${top - bh}`, fill: hue, opacity: 0.10 }));
+      g.appendChild(mk('rect', { x: mx - 1, y: top - bh, width: 2, height: bh, fill: hue, opacity: 0.22 }));
+    }
+    gCity.appendChild(g);
   };
 
-  // 奥の層（大気遠近でぼんやり）
-  let x = -12;
-  while (x < W + 12) { const w = ri(24, 54), h = ri(48, 120); gFar.appendChild(mk('rect', { x, y: H - h, width: w, height: h, rx: 1.5, fill: 'url(#bldgFar)' })); x += w + ri(4, 12); }
-  // 中間層（少しだけ窓）
-  x = -14;
-  while (x < W + 14) {
-    const w = ri(30, 58), h = ri(70, 150), y = H - h;
-    gMid.appendChild(mk('rect', { x, y, width: w, height: h, rx: 2, fill: 'url(#bldgMid)' }));
-    gMid.appendChild(mk('rect', { x, y, width: w, height: 1.5, fill: '#3aa6e0', opacity: 0.5 }));
-    const ww = 4, hh = 5, sx = 13, sy = 15;
-    for (let cx = x + 6; cx + ww < x + w - 5; cx += sx)
-      for (let cy = y + 10; cy + hh < H - 6; cy += sy)
-        if (Math.random() < 0.28) addWin(gMid, cx, cy, ww, hh, Math.random() < 0.3);
-    x += w + ri(12, 24);
-  }
-  // 手前の層（主役・立体的）
-  x = -16;
-  while (x < W + 16) { const w = ri(46, 96); addNear(x, w); x += w + ri(16, 30); }
+  // 奥の層 → 手前の層
+  let x = -16;
+  while (x < W + 16) { const w = ri(26, 52); addBuilding(x, w, 'back'); x += w + ri(6, 14); }
+  x = -18;
+  while (x < W + 18) { const w = ri(40, 92); addBuilding(x, w, 'front'); x += w + ri(10, 22); }
 
-  // ネオンの光条（ビルの間から立ち上る淡い光）
-  for (let i = 0; i < 7; i++) {
-    const sx = ri(40, W - 40), sw = ri(20, 46), sh = ri(70, 150);
-    gFx.appendChild(mk('rect', { x: sx, y: H - sh, width: sw, height: sh, fill: 'url(#shaft)', opacity: 0.5 }));
+  // 水面反射（都市を上下反転・減光・下へフェード）＋さざ波
+  const gRef = gCity.cloneNode(true);
+  gRef.setAttribute('transform', `matrix(1,0,0,-1,0,${2 * WL})`);
+  gRef.setAttribute('opacity', '0.4');
+  gRef.setAttribute('mask', 'url(#refMask)');
+  // さざ波（反射の上に暗い横線を重ねて水面感）
+  for (let i = 0; i < 26; i++) {
+    gFx.appendChild(mk('rect', { x: 0, y: WL + ri(4, Hv - WL - 2), width: W, height: 1, fill: '#05070f', opacity: rnd(0.15, 0.4).toFixed(2) }));
   }
-  // 地表のネオンライン
-  gFx.appendChild(mk('rect', { x: 0, y: H - 3, width: W, height: 3, fill: '#59e0ff', opacity: 0.3 }));
+  // 水際のネオンライン
+  gFx.appendChild(mk('rect', { x: 0, y: WL - 1, width: W, height: 2, fill: '#cfe9ff', opacity: 0.45 }));
+  gFx.appendChild(mk('rect', { x: 0, y: WL + 1, width: W, height: 1.5, fill: '#8fd6ff', opacity: 0.3 }));
 
-  svg.append(gFar, gMid, gFx, gNear);
+  svg.append(gRef, gFx, gCity);
   host.appendChild(svg);
 }
 
