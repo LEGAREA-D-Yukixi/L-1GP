@@ -230,6 +230,34 @@ export function annualTermLabel(name) {
   return stripped || s;
 }
 
+/** 会計期の算出: 9月開始（上期=9〜2月, 下期=3〜8月）。2026年9月＝7期目上期を基準にループ。 */
+export function fiscalTerm(todayISO) {
+  const dt = parseISODate(todayISO);
+  if (!dt) return { termNo: null, half: '', label: '', fiscalStartYear: null };
+  const y = dt.getUTCFullYear(), m = dt.getUTCMonth() + 1;
+  const fiscalStartYear = (m >= 9) ? y : y - 1;   // 9月開始
+  const termNo = fiscalStartYear - 2019;          // 2026 → 7期目
+  const half = (m >= 9 || m <= 2) ? '上期' : '下期'; // 9〜2月=上期, 3〜8月=下期
+  return { termNo, half, label: `${termNo}期目 ${half}`, fiscalStartYear };
+}
+
+/** 現在が下期か（年間集計タブの表示可否に使用） */
+export function isSecondHalf(todayISO) {
+  return fiscalTerm(todayISO).half === '下期';
+}
+
+/** シーズン開始前月(8月/2月)のカウントダウン: 翌月1日までの残日数と表示。該当外はactive:false */
+export function seasonCountdown(todayISO) {
+  const dt = parseISODate(todayISO);
+  if (!dt) return { active: false, days: 0, targetLabel: '' };
+  const y = dt.getUTCFullYear(), m = dt.getUTCMonth() + 1;
+  if (m !== 8 && m !== 2) return { active: false, days: 0, targetLabel: '' };
+  const tMonth = m + 1;                            // 8→9, 2→3
+  const target = new Date(Date.UTC(y, tMonth - 1, 1)); // 翌月1日
+  const days = Math.max(0, Math.ceil((target.getTime() - dt.getTime()) / 86400000));
+  return { active: true, days, targetLabel: `${tMonth}月1日` };
+}
+
 /** 順位表(ポイント降順)で、1つ上の順位との差分。1位はnull。戻り値は current - 上位（0以下）*/
 export function rankGaps(rows) {
   return (rows || []).map((r, i) =>
