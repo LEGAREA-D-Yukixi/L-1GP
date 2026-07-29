@@ -263,25 +263,23 @@
   <section id="secApply" class="hidden">
     <div class="banner"><span class="tri">▶▶</span>ポイント申請<span class="tri">◀◀</span></div>
 
-    <!-- 未ログイン: ログインフォーム -->
+    <!-- 未ログイン: メールのみでログイン -->
     <div id="applyLogin" class="card hidden">
-      <div class="muted">ポイント申請には申請権限のあるアカウントでのログインが必要です。</div>
+      <div class="muted">ポイント申請にはメンバー登録されたメールアドレスでのログインが必要です。</div>
       <label for="lgEmail">メールアドレス</label>
-      <input id="lgEmail" type="email" autocomplete="username" placeholder="you@legarea.jp">
-      <label for="lgPass">パスワード</label>
-      <input id="lgPass" type="password" autocomplete="current-password" placeholder="パスワード">
+      <input id="lgEmail" type="email" autocomplete="email" placeholder="you@legarea.jp">
       <button class="btn" id="lgBtn">ログイン</button>
       <div id="lgMsg" class="msg"></div>
     </div>
 
-    <!-- ログイン済みだが権限なし -->
+    <!-- メンバー未登録 -->
     <div id="applyDenied" class="card hidden">
       <div class="blackout">
-        <div class="big">🔒 申請権限がありません</div>
-        <p><span id="deniedEmail"></span> には申請権限が付与されていません。</p>
-        <p>運営（管理者）に申請者への追加を依頼してください。</p>
+        <div class="big">🔒 メンバー登録がありません</div>
+        <p><span id="deniedEmail"></span> はメンバー名簿に登録されていません。</p>
+        <p>運営（管理者）にメンバー登録を依頼してください。</p>
       </div>
-      <button class="btn" id="denyLogout" style="background:linear-gradient(90deg,#4a5a7e,#6c7a99)">別のアカウントでログイン</button>
+      <button class="btn" id="denyLogout" style="background:linear-gradient(90deg,#4a5a7e,#6c7a99)">別のメールでログイン</button>
     </div>
 
     <!-- 権限あり: 申請フォーム -->
@@ -533,15 +531,17 @@ function updateApPreview() {
 
 async function submitRequest() {
   const rule = currentRule();
-  const input = { division_id:$('apDivision').value, requester_name:$('apName').value, occurred_on:$('apDate').value, note:$('apNote').value, points:$('apPoints').value };
+  const reqName = (loginSession && loginSession.name) ? loginSession.name : $('apName').value;
+  const input = { division_id:$('apDivision').value, requester_name:reqName, occurred_on:$('apDate').value, note:$('apNote').value, points:$('apPoints').value };
   const v = validateRequestInput(input, rule);
   const msg = $('apMsg');
   if (!v.ok) { msg.className='msg ngmsg'; msg.textContent=v.errors.join('\n'); return; }
+  if (!loginSession || !loginSession.email) { msg.className='msg ngmsg'; msg.textContent='ログインが必要です。'; return; }
   $('apSubmit').disabled = true;
   const earner = ($('apEarnerSel') && !$('apEarnerSel').classList.contains('hidden'))
     ? $('apEarnerSel').value.trim()
     : $('apEarner').value.trim();
-  const payload = { division_id:input.division_id, rule_id:rule.id, occurred_on:input.occurred_on, requester_name:input.requester_name.trim(), earner_name:(earner || null), note:input.note || null };
+  const payload = { division_id:input.division_id, rule_id:rule.id, occurred_on:input.occurred_on, requester_name:input.requester_name.trim(), requester_email:loginSession.email, earner_name:(earner || null), note:input.note || null };
   if (rule.is_variable) payload.points = v.points;
   const { error } = await sb.from('l1_requests').insert(payload);
   $('apSubmit').disabled = false;
@@ -550,19 +550,16 @@ async function submitRequest() {
   $('apNote').value=''; $('apPoints').value=''; $('apEarner').value=''; if ($('apEarnerSel')) $('apEarnerSel').value='';
 }
 
-// メンバー名簿を読み込み: 申請者名の自動入力＋獲得者プルダウン
+// メンバー名簿を読み込み: 申請者名の自動入力（ログイン氏名）＋獲得者プルダウン
 async function loadMembersIntoForm() {
-  let names = [], myName = '';
+  let names = [];
   try {
-    const [{ data: rows }, { data: mine }] = await Promise.all([
-      sb.from('l1_member_names').select('name,is_active').order('name'),
-      sb.rpc('l1_my_name'),
-    ]);
+    const { data: rows } = await sb.from('l1_member_names').select('name,is_active').order('name');
     names = (rows || []).filter(r => r.is_active !== false).map(r => r.name).filter(Boolean);
-    myName = mine || '';
-  } catch { /* 名簿未整備でもフォームは動作（手入力にフォールバック） */ }
+  } catch { /* 名簿取得失敗でもフォールバックで動作 */ }
+  const myName = (loginSession && loginSession.name) ? loginSession.name : '';
 
-  // 申請者名: 名簿に氏名があれば自動入力＆読取専用、無ければ手入力
+  // 申請者名: ログイン氏名を自動入力＆読取専用
   const nameEl = $('apName');
   if (myName) { nameEl.value = myName; nameEl.readOnly = true; nameEl.style.opacity = '.85'; }
   else { nameEl.readOnly = false; nameEl.style.opacity = ''; }
@@ -584,44 +581,53 @@ function applyView(mode) { // 'login' | 'denied' | 'form'
   $('applyDenied').classList.toggle('hidden', mode !== 'denied');
   $('applyForm').classList.toggle('hidden', mode !== 'form');
 }
+// ---------- メールのみログイン（C-1: 名簿照合・パスワード無し） ----------
+const LOGIN_KEY = 'l1_login';
+let loginSession = null;   // { email, name }
+function loadSession() {
+  if (loginSession) return loginSession;
+  try { const raw = localStorage.getItem(LOGIN_KEY); if (raw) loginSession = JSON.parse(raw); } catch { /* file://等で不可なら無視 */ }
+  return loginSession;
+}
+function saveSession(s) { loginSession = s; try { localStorage.setItem(LOGIN_KEY, JSON.stringify(s)); } catch {} }
+function clearSession() { loginSession = null; try { localStorage.removeItem(LOGIN_KEY); } catch {} }
+
 async function refreshAdminLink() {
   try {
-    const { data: { session } } = await sb.auth.getSession();
+    const s = loadSession();
     let isAdmin = false;
-    if (session) { const { data } = await sb.rpc('l1_is_admin'); isAdmin = !!data; }
+    if (s && s.email) { const { data } = await sb.rpc('l1_is_admin_email', { p_email: s.email }); isAdmin = !!data; }
     $('adminLink').classList.toggle('hidden', !isAdmin);
   } catch { $('adminLink').classList.add('hidden'); }
 }
 async function refreshApplyGate() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) { applyView('login'); return; }
-  let can = false;
-  try { const { data } = await sb.rpc('l1_can_apply'); can = !!data; } catch { can = false; }
-  const email = session.user?.email ?? '';
-  if (can) {
-    $('whoami').textContent = email;
-    applyView('form');
-    await loadMembersIntoForm();
-    // 名簿に無い場合の申請者名フォールバック（メールのローカル部）
-    if (!$('apName').readOnly && !$('apName').value) $('apName').value = email.split('@')[0] ?? '';
-  } else {
-    $('deniedEmail').textContent = email;
-    applyView('denied');
-  }
+  const s = loadSession();
+  if (!s || !s.email) { applyView('login'); return; }
+  // 有効メンバーか再確認（名簿から外れていたら再ログインへ）
+  let member = false;
+  try { const { data } = await sb.rpc('l1_is_member', { p_email: s.email }); member = !!data; } catch { member = false; }
+  if (!member) { clearSession(); applyView('login'); return; }
+  $('whoami').textContent = s.email;
+  applyView('form');
+  await loadMembersIntoForm();
 }
 async function applyLogin() {
   const msg = $('lgMsg');
-  const email = $('lgEmail').value.trim(), pass = $('lgPass').value;
-  if (!email || !pass) { msg.className='msg ngmsg'; msg.textContent='メールとパスワードを入力してください'; return; }
+  const email = $('lgEmail').value.trim();
+  if (!email) { msg.className='msg ngmsg'; msg.textContent='メールアドレスを入力してください'; return; }
   $('lgBtn').disabled = true;
-  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  let name = null, failed = false;
+  try { const { data, error } = await sb.rpc('l1_member_login', { p_email: email }); if (error) failed = true; else name = data; }
+  catch { failed = true; }
   $('lgBtn').disabled = false;
-  if (error) { msg.className='msg ngmsg'; msg.textContent='ログインに失敗しました: ' + error.message; return; }
-  $('lgMsg').className='msg'; $('lgPass').value='';
+  if (failed) { msg.className='msg ngmsg'; msg.textContent='ログイン処理でエラーが発生しました。時間をおいて再度お試しください。'; return; }
+  if (!name) { $('deniedEmail').textContent = email; applyView('denied'); return; }
+  msg.className='msg';
+  saveSession({ email, name });
   await refreshApplyGate();
   await refreshAdminLink();
 }
-async function applyLogout() { await sb.auth.signOut(); applyView('login'); refreshAdminLink(); }
+async function applyLogout() { clearSession(); applyView('login'); refreshAdminLink(); }
 
 function switchTab(tab) {
   const map = [['tabSeason','secSeason'],['tabAnnual','secAnnual'],['tabCriteria','secCriteria'],['tabApply','secApply']];
@@ -795,9 +801,10 @@ async function init() {
     $('apRule').addEventListener('change', updateApPreview);
     $('apSubmit').addEventListener('click', submitRequest);
     $('lgBtn').addEventListener('click', applyLogin);
-    $('lgPass').addEventListener('keydown', e => { if (e.key === 'Enter') applyLogin(); });
+    $('lgEmail').addEventListener('keydown', e => { if (e.key === 'Enter') applyLogin(); });
     $('denyLogout').addEventListener('click', applyLogout);
     $('logoutLink').addEventListener('click', e => { e.preventDefault(); applyLogout(); });
+    loadSession();
     refreshAdminLink();
   } catch (e) {
     $('loading').classList.add('hidden');
