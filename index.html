@@ -652,14 +652,29 @@ function loadSession() {
 function saveSession(s) { loginSession = s; try { localStorage.setItem(LOGIN_KEY, JSON.stringify(s)); } catch {} }
 function clearSession() { loginSession = null; try { localStorage.removeItem(LOGIN_KEY); } catch {} }
 
-// ログイン画面の氏名プルダウンを名簿から生成（申請権限のある人のみ）
+// ログイン画面の氏名プルダウン（申請権限者 ＋ 管理者）
 async function populateLoginNames() {
   try {
-    const { data } = await sb.from('l1_member_names').select('name,is_active,can_apply').order('name');
-    const names = [...new Set((data || []).filter(r => r.is_active !== false && r.can_apply === true).map(r => r.name).filter(Boolean))];
+    const [memRes, admRes] = await Promise.all([
+      sb.from('l1_member_names').select('name,is_active,can_apply').order('name'),
+      sb.rpc('l1_admin_names'),
+    ]);
+    const applyNames = (memRes.data || []).filter(r => r.is_active !== false && r.can_apply === true).map(r => r.name);
+    const adminNames = Array.isArray(admRes.data) ? admRes.data : [];
+    const names = [...new Set([...applyNames, ...adminNames].filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'ja'));
     const sel = $('lgName');
     if (sel) sel.innerHTML = '<option value="">氏名を選択</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
   } catch { /* 取得失敗時は空のまま */ }
+}
+// 申請できる氏名か（申請権限者 または 管理者）
+async function canApplyName(name) {
+  try {
+    const [a, b] = await Promise.all([
+      sb.rpc('l1_can_apply_name', { p_name: name }),
+      sb.rpc('l1_is_admin_name', { p_name: name }),
+    ]);
+    return !!a.data || !!b.data;
+  } catch { return false; }
 }
 async function refreshAdminLink() {
   try {
@@ -672,9 +687,8 @@ async function refreshAdminLink() {
 async function refreshApplyGate() {
   const s = loadSession();
   if (!s || !s.name) { await populateLoginNames(); applyView('login'); return; }
-  // 申請権限のある人か再確認（権限が外れていたら再ログインへ）
-  let allowed = false;
-  try { const { data } = await sb.rpc('l1_can_apply_name', { p_name: s.name }); allowed = !!data; } catch { allowed = false; }
+  // 申請できる人か再確認（申請権限者 または 管理者）
+  let allowed = await canApplyName(s.name);
   if (!allowed) { clearSession(); await populateLoginNames(); applyView('login'); return; }
   $('whoami').textContent = s.name;
   applyView('form');
@@ -685,11 +699,8 @@ async function applyLogin() {
   const name = $('lgName').value.trim();
   if (!name) { msg.className='msg ngmsg'; msg.textContent='お名前を選択してください'; return; }
   $('lgBtn').disabled = true;
-  let ok = false, failed = false;
-  try { const { data, error } = await sb.rpc('l1_can_apply_name', { p_name: name }); if (error) failed = true; else ok = !!data; }
-  catch { failed = true; }
+  const ok = await canApplyName(name);
   $('lgBtn').disabled = false;
-  if (failed) { msg.className='msg ngmsg'; msg.textContent='ログイン処理でエラーが発生しました。時間をおいて再度お試しください。'; return; }
   if (!ok) { $('deniedEmail').textContent = name; applyView('denied'); return; }
   msg.className='msg';
   saveSession({ name });
