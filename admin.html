@@ -45,6 +45,10 @@
   td input, td select { min-width: 70px; }
   .voided { opacity: .45; text-decoration: line-through; }
   .rank1 { color: var(--accent); font-weight: 800; }
+  .pwwrap { position: relative; }
+  .pwwrap input { width: 100%; box-sizing: border-box; padding-right: 40px; }
+  .pwwrap .eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: transparent; border: none; cursor: pointer; font-size: 18px; line-height: 1; padding: 4px; opacity: .8; }
+  .pwwrap .eye:hover { opacity: 1; }
 </style>
 </head>
 <body>
@@ -54,12 +58,25 @@
   <!-- ログイン -->
   <div id="loginCard" class="card">
     <h2>管理者ログイン</h2>
-    <label for="lgEmail">メールアドレス</label>
-    <input id="lgEmail" type="email" autocomplete="username">
+    <label for="lgName">お名前</label>
+    <select id="lgName"><option value="">氏名を選択</option></select>
     <label for="lgPass">パスワード</label>
-    <input id="lgPass" type="password" autocomplete="current-password">
+    <div class="pwwrap"><input id="lgPass" type="password" autocomplete="current-password"><button type="button" class="eye" id="lgEye" aria-label="表示切替">👁</button></div>
     <div style="margin-top:12px"><button class="btn" id="lgBtn">ログイン</button></div>
     <div id="lgMsg" class="msg"></div>
+    <div class="muted" style="margin-top:10px">初期パスワードは運営から共有されたものを使用し、初回ログイン時に必ず変更してください。</div>
+  </div>
+
+  <!-- 初回パスワード再設定（強制） -->
+  <div id="resetCard" class="card hidden">
+    <h2>パスワードの再設定</h2>
+    <div class="muted" style="margin-bottom:8px">初回ログインのため、新しいパスワードを設定してください（8文字以上）。</div>
+    <label for="npw1">新しいパスワード</label>
+    <div class="pwwrap"><input id="npw1" type="password" autocomplete="new-password"><button type="button" class="eye" id="npw1Eye" aria-label="表示切替">👁</button></div>
+    <label for="npw2">新しいパスワード（確認）</label>
+    <div class="pwwrap"><input id="npw2" type="password" autocomplete="new-password"><button type="button" class="eye" id="npw2Eye" aria-label="表示切替">👁</button></div>
+    <div style="margin-top:12px"><button class="btn" id="npwBtn">パスワードを設定</button></div>
+    <div id="npwMsg" class="msg"></div>
   </div>
 
   <!-- 管理UI -->
@@ -220,10 +237,26 @@ function flash(el, okFlag, text) {
 }
 const gmsg = (okFlag, text) => flash($('gMsg'), okFlag, text);
 
-// ---------- 認証 ----------
+// ---------- 認証（氏名＋パスワード / 内部は Supabase Auth） ----------
+async function populateAdminNames() {
+  try {
+    const { data } = await sb.rpc('l1_admin_names');
+    const names = Array.isArray(data) ? data : [];
+    const sel = $('lgName');
+    if (sel) sel.innerHTML = '<option value="">氏名を選択</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  } catch { /* 取得失敗時は空 */ }
+}
 async function login() {
-  const { error } = await sb.auth.signInWithPassword({ email: $('lgEmail').value.trim(), password: $('lgPass').value });
-  if (error) { flash($('lgMsg'), false, 'ログイン失敗: ' + error.message); return; }
+  const name = $('lgName').value.trim();
+  if (!name) { flash($('lgMsg'), false, 'お名前を選択してください'); return; }
+  const pass = $('lgPass').value;
+  if (!pass) { flash($('lgMsg'), false, 'パスワードを入力してください'); return; }
+  let email = null;
+  try { const { data } = await sb.rpc('l1_admin_email_by_name', { p_name: name }); email = data; } catch {}
+  if (!email) { flash($('lgMsg'), false, 'この氏名の管理者アカウントが見つかりません。'); return; }
+  state._loginName = name;
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) { flash($('lgMsg'), false, 'ログインに失敗しました。パスワードをご確認ください。'); return; }
   await afterAuth();
 }
 async function afterAuth() {
@@ -236,14 +269,38 @@ async function afterAuth() {
     return;
   }
   state.user = user;
-  $('whoami').textContent = `ログイン中: ${user.email}`;
+  // 初回ログインはパスワード再設定を強制
+  let mustReset = false;
+  try { const { data } = await sb.rpc('l1_my_must_reset'); mustReset = !!data; } catch { mustReset = false; }
+  if (mustReset) {
+    $('loginCard').classList.add('hidden');
+    $('resetCard').classList.remove('hidden');
+    return;
+  }
+  await enterAdmin();
+}
+async function enterAdmin() {
   $('loginCard').classList.add('hidden');
+  $('resetCard').classList.add('hidden');
   $('adminUI').classList.remove('hidden');
-  // 個人成績の閲覧権限
   try { const { data } = await sb.rpc('l1_can_view_individual'); state.canIndividual = !!data; } catch { state.canIndividual = false; }
   $('tabIndividualBtn').classList.toggle('hidden', !state.canIndividual);
   await reloadAll();
+  const me = (state.admins || []).find(a => a.user_id === state.user?.id);
+  $('whoami').textContent = 'ログイン中: ' + (me?.lark_name || state._loginName || state.user?.email || '');
 }
+async function submitNewPassword() {
+  const p1 = $('npw1').value, p2 = $('npw2').value;
+  if ((p1 || '').length < 8) { flash($('npwMsg'), false, 'パスワードは8文字以上で設定してください'); return; }
+  if (p1 !== p2) { flash($('npwMsg'), false, '確認用パスワードが一致しません'); return; }
+  const { error } = await sb.auth.updateUser({ password: p1 });
+  if (error) { flash($('npwMsg'), false, '設定に失敗しました: ' + error.message); return; }
+  try { await sb.rpc('l1_clear_must_reset'); } catch {}
+  $('npw1').value = ''; $('npw2').value = '';
+  flash($('npwMsg'), true, 'パスワードを更新しました');
+  await enterAdmin();
+}
+function eyeToggle(inputId) { const el = $(inputId); if (el) el.type = (el.type === 'password' ? 'text' : 'password'); }
 async function logout() { await sb.auth.signOut(); location.reload(); }
 
 // ---------- データ取得 ----------
@@ -727,6 +784,10 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
 }));
 $('lgBtn').addEventListener('click', login);
 $('lgPass').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+$('lgEye').addEventListener('click', () => eyeToggle('lgPass'));
+$('npwBtn').addEventListener('click', submitNewPassword);
+$('npw1Eye').addEventListener('click', () => eyeToggle('npw1'));
+$('npw2Eye').addEventListener('click', () => eyeToggle('npw2'));
 $('logoutBtn').addEventListener('click', logout);
 $('dcRule').addEventListener('change', () => $('dcPointsWrap').classList.toggle('hidden', !rOf($('dcRule').value)?.is_variable));
 $('dcSubmit').addEventListener('click', directSubmit);
@@ -740,7 +801,8 @@ $('newAplBtn').addEventListener('click', addApplicant);
 $('newMemBtn').addEventListener('click', addMember);
 $('larkSyncBtn').addEventListener('click', larkSyncNow);
 
-afterAuth(); // セッションが残っていれば自動ログイン
+populateAdminNames();   // ログイン用の氏名プルダウンを用意
+afterAuth();            // セッションが残っていれば自動ログイン
 </script>
 </body>
 </html>
