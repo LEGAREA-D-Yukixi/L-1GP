@@ -115,6 +115,13 @@
   .medallion { width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:20px; color:#2a1c00;
     box-shadow:0 3px 8px rgba(0,0,0,.5),inset 0 2px 4px rgba(255,255,255,.6),inset 0 -3px 6px rgba(0,0,0,.35); border:2px solid rgba(255,255,255,.35); flex:0 0 auto; }
   .medallion.mlarge { width:76px; height:76px; font-size:38px; border-width:3px; }
+  .medallion { position:relative; overflow:hidden; }
+  .medallion::after { content:""; position:absolute; inset:0; border-radius:50%; pointer-events:none;
+    background:radial-gradient(120% 82% at 30% 16%, rgba(255,255,255,.6), rgba(255,255,255,0) 55%); }
+  .medallion .mico { width:62%; height:62%; display:block; position:relative; z-index:1;
+    filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.5)); }
+  .medallion.mlarge .mico { width:66%; height:66%; }
+  .medallion .mnum { position:relative; z-index:1; text-shadow:0 1px 1px rgba(255,255,255,.55), 0 -1px 2px rgba(0,0,0,.4); }
   .m-gold{background:var(--g-gold)} .m-silver{background:var(--g-silver)} .m-bronze{background:var(--g-bronze)}
   .m-blue{background:linear-gradient(150deg,#8fd0ff,#2f7fd0,#173a7e);color:#eaf6ff;text-shadow:0 1px 2px rgba(0,0,0,.5)}
   .m-danger{background:linear-gradient(150deg,#fff2a8,#ffd400,#b39400);color:#3a2b00}
@@ -362,6 +369,32 @@ async function loadAll() {
 }
 
 /** 案3: 3D深度 逆ピラミッド + ミニ基準線ゲージ（左端0・中央1,000／数字なし） */
+// メダル内のリッチアイコン（王冠 / ドクロ）
+function crownSVG() {
+  return `<svg viewBox="0 0 24 24" class="mico" aria-hidden="true">
+    <defs><linearGradient id="l1CrownG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff6cf"/><stop offset=".5" stop-color="#ffcf3f"/><stop offset="1" stop-color="#8f6300"/></linearGradient></defs>
+    <path d="M2.8 8.2l3.4 3.1L12 4.8l5.8 6.5 3.4-3.1-1.5 9.4a1 1 0 0 1-1 .85H5.3a1 1 0 0 1-1-.85L2.8 8.2z"
+      fill="url(#l1CrownG)" stroke="#5f4200" stroke-width="1" stroke-linejoin="round"/>
+    <rect x="5" y="18.4" width="14" height="2.7" rx="1.1" fill="#c8951e" stroke="#5f4200" stroke-width=".7"/>
+    <circle cx="12" cy="10.6" r="1.6" fill="#ff5d73" stroke="#7a1020" stroke-width=".6"/>
+    <circle cx="6.1" cy="9.2" r="1.05" fill="#67d9ff" stroke="#0b4a66" stroke-width=".5"/>
+    <circle cx="17.9" cy="9.2" r="1.05" fill="#67d9ff" stroke="#0b4a66" stroke-width=".5"/>
+    <path d="M4.4 9.1 12 6 19.6 9.1" fill="none" stroke="#fff8dc" stroke-width=".8" opacity=".75"/>
+  </svg>`;
+}
+function skullSVG() {
+  return `<svg viewBox="0 0 24 24" class="mico" aria-hidden="true">
+    <path d="M12 2.2c5.1 0 8.2 3.4 8.2 8 0 2.6-1.1 4.1-2.4 5.2-.5.4-.7.8-.7 1.4v1.3a1.5 1.5 0 0 1-1.5 1.5h-.7v-2h-1.3v2h-1.5v-2h-1.6v2H8.8v-2H8.1v2H7.4A1.5 1.5 0 0 1 5.9 18v-1.2c0-.6-.2-1-.7-1.4C3.9 14.3 2.8 12.8 2.8 10.2c0-4.6 3.1-8 9.2-8z"
+      fill="#241a10" stroke="#000" stroke-width=".7"/>
+    <circle cx="8.4" cy="11" r="2.4" fill="#0a0a0a"/>
+    <circle cx="15.6" cy="11" r="2.4" fill="#0a0a0a"/>
+    <circle cx="8.9" cy="10.5" r=".55" fill="#ff5a5a" opacity=".85"/>
+    <circle cx="16.1" cy="10.5" r=".55" fill="#ff5a5a" opacity=".85"/>
+    <path d="M12 13.4l1.25 2.3h-2.5z" fill="#0a0a0a"/>
+  </svg>`;
+}
+
 function renderPyramid(container, rows, baseline) {
   const total = rows.length;
   const maxRank = rows.length ? Math.max(...rows.map(r => r.rank)) : 0;
@@ -379,7 +412,7 @@ function renderPyramid(container, rows, baseline) {
       : r.rank === 3 ? 'm-bronze'
       : 'm-blue';
     const big = (isChamp || isLast) ? ' mlarge' : '';
-    const badge = isChamp ? '👑' : (isLast ? '☠' : r.rank);
+    const badge = isChamp ? crownSVG() : (isLast ? skullSVG() : `<span class="mnum">${r.rank}</span>`);
     const fillCls = isChamp ? 'champ' : (bar.side === 'down' ? 'down' : 'up');
     const el = document.createElement('div');
     el.className = 'prow' + (isChamp ? ' champ' : '') + (isLast ? ' last' : '');
