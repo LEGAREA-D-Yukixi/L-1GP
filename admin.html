@@ -199,7 +199,6 @@
       <div class="row" style="justify-content:space-between; align-items:center">
         <h2 style="margin:0">メンバー名簿</h2>
       </div>
-      <div class="muted" style="margin:8px 0">氏名（と所属Division）を登録します。組織メンバーは毎日自動でLark同期されます（氏名は必須）。ログイン用アカウントは氏名ベースで発行されます。</div>
       <div id="memBody"></div>
       <div class="row" style="margin-top:10px; align-items:flex-end">
         <div><label>氏名</label><input id="newMemName" type="text" placeholder="山田 太郎"></div>
@@ -462,7 +461,7 @@ function renderEvents() {
         <td>${esc(e.category)}<span class="muted">｜${esc(e.label)}</span></td>
         <td class="${e.points >= 0 ? 'add' : 'deduct'}">${esc(formatPoints(e.points))}</td>
         <td class="muted" style="max-width:240px">${esc(e.note ?? '')}${e.voided_at ? `<br>【取消: ${esc(e.voided_reason ?? '')}】` : ''}</td>
-        <td class="muted">${e.request_id ? '申請' : '直接'}</td>
+        <td class="muted" style="white-space:nowrap">${e.request_id ? '申請' : '直接'}</td>
         <td>${e.voided_at ? '' : `<button class="btn sm red" data-void="${e.id}">打消し</button>`}</td>
       </tr>`).join('') + '</tbody></table>';
   $('evBody').querySelectorAll('[data-void]').forEach(b => b.addEventListener('click', () => voidEvent(b.dataset.void)));
