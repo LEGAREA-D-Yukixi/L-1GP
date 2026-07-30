@@ -49,6 +49,8 @@
   .pwwrap input { width: 100%; box-sizing: border-box; padding-right: 40px; }
   .pwwrap .eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: transparent; border: none; cursor: pointer; font-size: 18px; line-height: 1; padding: 4px; opacity: .8; }
   .pwwrap .eye:hover { opacity: 1; }
+  .pwwrap .eye { display:flex; align-items:center; }
+  .pwwrap .eye svg { width:22px; height:22px; display:block; }
 </style>
 </head>
 <body>
@@ -61,7 +63,7 @@
     <label for="lgName">お名前</label>
     <select id="lgName"><option value="">氏名を選択</option></select>
     <label for="lgPass">パスワード</label>
-    <div class="pwwrap"><input id="lgPass" type="password" autocomplete="current-password"><button type="button" class="eye" id="lgEye" aria-label="表示切替">👁</button></div>
+    <div class="pwwrap"><input id="lgPass" type="password" autocomplete="current-password"><button type="button" class="eye" id="lgEye" aria-label="パスワード表示切替"></button></div>
     <div style="margin-top:12px"><button class="btn" id="lgBtn">ログイン</button></div>
     <div id="lgMsg" class="msg"></div>
     <div class="muted" style="margin-top:10px">初期パスワードは運営から共有されたものを使用し、初回ログイン時に必ず変更してください。</div>
@@ -72,9 +74,9 @@
     <h2>パスワードの再設定</h2>
     <div class="muted" style="margin-bottom:8px">初回ログインのため、新しいパスワードを設定してください（8文字以上）。</div>
     <label for="npw1">新しいパスワード</label>
-    <div class="pwwrap"><input id="npw1" type="password" autocomplete="new-password"><button type="button" class="eye" id="npw1Eye" aria-label="表示切替">👁</button></div>
+    <div class="pwwrap"><input id="npw1" type="password" autocomplete="new-password"><button type="button" class="eye" id="npw1Eye" aria-label="パスワード表示切替"></button></div>
     <label for="npw2">新しいパスワード（確認）</label>
-    <div class="pwwrap"><input id="npw2" type="password" autocomplete="new-password"><button type="button" class="eye" id="npw2Eye" aria-label="表示切替">👁</button></div>
+    <div class="pwwrap"><input id="npw2" type="password" autocomplete="new-password"><button type="button" class="eye" id="npw2Eye" aria-label="パスワード表示切替"></button></div>
     <div style="margin-top:12px"><button class="btn" id="npwBtn">パスワードを設定</button></div>
     <div id="npwMsg" class="msg"></div>
   </div>
@@ -300,7 +302,8 @@ async function submitNewPassword() {
   flash($('npwMsg'), true, 'パスワードを更新しました');
   await enterAdmin();
 }
-function eyeToggle(inputId) { const el = $(inputId); if (el) el.type = (el.type === 'password' ? 'text' : 'password'); }
+function eyeIcon(visible){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+'<path d="M2 12S5.5 5.5 12 5.5 22 12 22 12 18.5 18.5 12 18.5 2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'+(visible?'<line x1="4" y1="4" x2="20" y2="20"/>':'')+'</svg>'; }
+function initEye(btnId, inputId){ const b=$(btnId); if(!b) return; b.innerHTML=eyeIcon(false); b.addEventListener('click', ()=>{ const el=$(inputId); if(!el) return; const willShow=el.type==='password'; el.type=willShow?'text':'password'; b.innerHTML=eyeIcon(willShow); }); }
 async function logout() { await sb.auth.signOut(); location.reload(); }
 
 // ---------- データ取得 ----------
@@ -801,10 +804,10 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
 }));
 $('lgBtn').addEventListener('click', login);
 $('lgPass').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
-$('lgEye').addEventListener('click', () => eyeToggle('lgPass'));
+initEye('lgEye','lgPass');
 $('npwBtn').addEventListener('click', submitNewPassword);
-$('npw1Eye').addEventListener('click', () => eyeToggle('npw1'));
-$('npw2Eye').addEventListener('click', () => eyeToggle('npw2'));
+initEye('npw1Eye','npw1');
+initEye('npw2Eye','npw2');
 $('logoutBtn').addEventListener('click', logout);
 $('dcRule').addEventListener('change', () => $('dcPointsWrap').classList.toggle('hidden', !rOf($('dcRule').value)?.is_variable));
 $('dcSubmit').addEventListener('click', directSubmit);

@@ -223,12 +223,44 @@
     -webkit-mask-image:linear-gradient(180deg, transparent 0, #000 14%);
     mask-image:linear-gradient(180deg, transparent 0, #000 14%); }
   .foot-note { text-align:center; color:var(--muted); font-size:11px; margin-top:18px; }
+  .pwwrap { position:relative; }
+  .pwwrap input { width:100%; box-sizing:border-box; padding-right:44px; }
+  .pwwrap .eye { position:absolute; right:8px; top:50%; transform:translateY(-50%); background:transparent; border:none; cursor:pointer; padding:4px; color:var(--muted); display:flex; align-items:center; }
+  .pwwrap .eye:hover { color:var(--text); }
+  .pwwrap .eye svg { width:22px; height:22px; display:block; }
 </style>
 </head>
 <body>
 <div class="bgfx"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
 <div class="shooting-layer" id="shootingLayer"></div>
 <div class="wrap">
+
+  <!-- ログイン（氏名＋パスワード / 内部はSupabase Auth） -->
+  <div id="dashLogin" class="card">
+    <h2 style="margin-top:0">ログイン</h2>
+    <div class="muted" style="margin-bottom:8px">メンバー名簿のお名前を選び、パスワードを入力してください。</div>
+    <label for="dashLgName">お名前</label>
+    <select id="dashLgName"><option value="">氏名を選択</option></select>
+    <label for="dashLgPass">パスワード</label>
+    <div class="pwwrap"><input id="dashLgPass" type="password" autocomplete="current-password"><button type="button" class="eye" id="dashLgEye" aria-label="パスワード表示切替"></button></div>
+    <div style="margin-top:12px"><button class="btn" id="dashLgBtn">ログイン</button></div>
+    <div id="dashLgMsg" class="msg"></div>
+    <div class="muted" style="margin-top:10px">初期パスワードは運営から共有されたものを使用し、初回ログイン時に変更してください。</div>
+  </div>
+
+  <!-- 初回パスワード再設定 -->
+  <div id="dashReset" class="card hidden">
+    <h2 style="margin-top:0">パスワードの再設定</h2>
+    <div class="muted" style="margin-bottom:8px">初回ログインのため、新しいパスワードを設定してください（8文字以上）。</div>
+    <label for="dashNpw1">新しいパスワード</label>
+    <div class="pwwrap"><input id="dashNpw1" type="password" autocomplete="new-password"><button type="button" class="eye" id="dashNpw1Eye" aria-label="パスワード表示切替"></button></div>
+    <label for="dashNpw2">新しいパスワード（確認）</label>
+    <div class="pwwrap"><input id="dashNpw2" type="password" autocomplete="new-password"><button type="button" class="eye" id="dashNpw2Eye" aria-label="パスワード表示切替"></button></div>
+    <div style="margin-top:12px"><button class="btn" id="dashNpwBtn">パスワードを設定</button></div>
+    <div id="dashNpwMsg" class="msg"></div>
+  </div>
+
+  <div id="dashMain" class="hidden">
   <a id="adminLink" href="./admin.html" class="admin-link hidden">管理画面 ›</a>
   <header>
     <div class="kicker">Division 対抗ポイントバトル！</div>
@@ -283,26 +315,7 @@
   <section id="secApply" class="hidden">
     <div class="banner"><span class="tri">▶▶</span>ポイント申請<span class="tri">◀◀</span></div>
 
-    <!-- 未ログイン: 氏名を選んでログイン（申請権限者のみ） -->
-    <div id="applyLogin" class="card hidden">
-      <div class="muted">ポイント申請には、申請権限のあるご自身の氏名を選んでください。</div>
-      <label for="lgName">お名前</label>
-      <select id="lgName"><option value="">氏名を選択</option></select>
-      <button class="btn" id="lgBtn">ログイン</button>
-      <div id="lgMsg" class="msg"></div>
-    </div>
-
-    <!-- 申請権限なし -->
-    <div id="applyDenied" class="card hidden">
-      <div class="blackout">
-        <div class="big">🔒 申請権限がありません</div>
-        <p><span id="deniedEmail"></span> にはポイント申請の権限が付与されていません。</p>
-        <p>運営（管理者）に権限付与を依頼してください。</p>
-      </div>
-      <button class="btn" id="denyLogout" style="background:linear-gradient(90deg,#4a5a7e,#6c7a99)">氏名を選び直す</button>
-    </div>
-
-    <!-- 権限あり: 申請フォーム -->
+    <!-- 申請フォーム（申請権限者のみタブが表示される） -->
     <div id="applyForm" class="card hidden">
       <div class="muted" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
         <span>申請内容は運営の承認後にダッシュボードへ反映されます。</span>
@@ -332,6 +345,7 @@
   </section>
 
   <div class="foot-note"></div>
+  </div><!-- /#dashMain -->
 </div>
 <div id="skyline"></div>
 
@@ -625,33 +639,34 @@ async function loadMembersIntoForm() {
 }
 
 // ---------- 申請の認証・権限ゲート ----------
-function applyView(mode) { // 'login' | 'denied' | 'form'
-  $('applyLogin').classList.toggle('hidden', mode !== 'login');
-  $('applyDenied').classList.toggle('hidden', mode !== 'denied');
+function applyView(mode) { // 'form' のみ使用（グローバルログイン集約後）
   $('applyForm').classList.toggle('hidden', mode !== 'form');
 }
-// ---------- 氏名選択ログイン（メール不要・名簿照合・パスワード無し） ----------
-const LOGIN_KEY = 'l1_login';
-let loginSession = null;   // { name }
-function loadSession() {
-  if (loginSession) return loginSession;
-  try { const raw = localStorage.getItem(LOGIN_KEY); if (raw) loginSession = JSON.parse(raw); } catch { /* file://等で不可なら無視 */ }
-  return loginSession;
+// ---------- Apple風の目アイコン（オリジナル線画） ----------
+function eyeIcon(visible) { // visible=パスワードが表示中か（表示中は斜線付き＝「隠す」）
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M2 12S5.5 5.5 12 5.5 22 12 22 12 18.5 18.5 12 18.5 2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'
+    + (visible ? '<line x1="4" y1="4" x2="20" y2="20"/>' : '') + '</svg>';
 }
-function saveSession(s) { loginSession = s; try { localStorage.setItem(LOGIN_KEY, JSON.stringify(s)); } catch {} }
-function clearSession() { loginSession = null; try { localStorage.removeItem(LOGIN_KEY); } catch {} }
-
-// ログイン画面の氏名プルダウン（申請権限者 ＋ 管理者）
+function initEye(btnId, inputId) {
+  const b = $(btnId); if (!b) return;
+  b.innerHTML = eyeIcon(false);
+  b.addEventListener('click', () => {
+    const el = $(inputId); if (!el) return;
+    const willShow = el.type === 'password';
+    el.type = willShow ? 'text' : 'password';
+    b.innerHTML = eyeIcon(willShow);
+  });
+}
+// ---------- ログイン（氏名＋パスワード / 内部は Supabase Auth） ----------
+let loginSession = null;   // { name }
+// ログイン氏名プルダウン（在籍メンバー全員）
 async function populateLoginNames() {
   try {
-    const [memRes, admRes] = await Promise.all([
-      sb.from('l1_member_names').select('name,is_active,can_apply').order('name'),
-      sb.rpc('l1_admin_names'),
-    ]);
-    const applyNames = (memRes.data || []).filter(r => r.is_active !== false && r.can_apply === true).map(r => r.name);
-    const adminNames = Array.isArray(admRes.data) ? admRes.data : [];
-    const names = [...new Set([...applyNames, ...adminNames].filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'ja'));
-    const sel = $('lgName');
+    const { data } = await sb.from('l1_member_names').select('name,is_active').order('name');
+    const names = [...new Set((data || []).filter(r => r.is_active !== false).map(r => r.name).filter(Boolean))]
+      .sort((a, b) => String(a).localeCompare(String(b), 'ja'));
+    const sel = $('dashLgName');
     if (sel) sel.innerHTML = '<option value="">氏名を選択</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
   } catch { /* 取得失敗時は空のまま */ }
 }
@@ -667,43 +682,84 @@ async function canApplyName(name) {
 }
 async function refreshAdminLink() {
   try {
-    const s = loadSession();
+    const name = loginSession && loginSession.name;
     let isAdmin = false;
-    if (s && s.name) { const { data } = await sb.rpc('l1_is_admin_name', { p_name: s.name }); isAdmin = !!data; }
+    if (name) { const { data } = await sb.rpc('l1_is_admin_name', { p_name: name }); isAdmin = !!data; }
     $('adminLink').classList.toggle('hidden', !isAdmin);
   } catch { $('adminLink').classList.add('hidden'); }
 }
-async function refreshApplyGate() {
-  const s = loadSession();
-  if (!s || !s.name) { await populateLoginNames(); applyView('login'); return; }
-  // 申請できる人か再確認（申請権限者 または 管理者）
-  let allowed = await canApplyName(s.name);
-  if (!allowed) { clearSession(); await populateLoginNames(); applyView('login'); return; }
-  $('whoami').textContent = s.name;
-  applyView('form');
-  await loadMembersIntoForm();
+async function dashLogin() {
+  const msg = $('dashLgMsg');
+  const name = $('dashLgName').value.trim();
+  const pass = $('dashLgPass').value;
+  if (!name) { msg.className = 'msg ngmsg'; msg.textContent = 'お名前を選択してください'; return; }
+  if (!pass) { msg.className = 'msg ngmsg'; msg.textContent = 'パスワードを入力してください'; return; }
+  let email = null;
+  try { const { data } = await sb.rpc('l1_member_email_by_name', { p_name: name }); email = data; } catch {}
+  if (!email) { msg.className = 'msg ngmsg'; msg.textContent = 'この氏名のアカウントが見つかりません。運営にお問い合わせください。'; return; }
+  $('dashLgBtn').disabled = true;
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  $('dashLgBtn').disabled = false;
+  if (error) { msg.className = 'msg ngmsg'; msg.textContent = 'ログインに失敗しました。パスワードをご確認ください。'; return; }
+  msg.className = 'msg'; msg.textContent = '';
+  await dashAfterAuth();
 }
-async function applyLogin() {
-  const msg = $('lgMsg');
-  const name = $('lgName').value.trim();
-  if (!name) { msg.className='msg ngmsg'; msg.textContent='お名前を選択してください'; return; }
-  $('lgBtn').disabled = true;
-  const ok = await canApplyName(name);
-  $('lgBtn').disabled = false;
-  if (!ok) { $('deniedEmail').textContent = name; applyView('denied'); return; }
-  msg.className='msg';
-  saveSession({ name });
-  await refreshApplyGate();
-  await refreshAdminLink();
+async function dashAfterAuth() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+  // 在籍チェック（名簿から削除/無効化された人はログイン不可）
+  let active = false;
+  try { const { data } = await sb.rpc('l1_my_member_active'); active = !!data; } catch { active = false; }
+  if (!active) {
+    await sb.auth.signOut();
+    const msg = $('dashLgMsg'); msg.className = 'msg ngmsg';
+    msg.textContent = 'このアカウントは現在ご利用いただけません（名簿に登録がありません）。';
+    return;
+  }
+  let mustReset = false;
+  try { const { data } = await sb.rpc('l1_my_member_must_reset'); mustReset = !!data; } catch { mustReset = false; }
+  if (mustReset) { $('dashLogin').classList.add('hidden'); $('dashReset').classList.remove('hidden'); return; }
+  await enterDashboard();
 }
-async function applyLogout() { clearSession(); await populateLoginNames(); applyView('login'); refreshAdminLink(); }
+async function enterDashboard() {
+  let myName = '';
+  try { const { data } = await sb.rpc('l1_my_member_name'); myName = data || ''; } catch {}
+  loginSession = { name: myName };
+  $('dashLogin').classList.add('hidden');
+  $('dashReset').classList.add('hidden');
+  $('dashMain').classList.remove('hidden');
+  await loadAll();
+  $('loading').classList.add('hidden');
+  renderStandings(); renderApplyForm();
+  $('tabAnnual').classList.toggle('hidden', !isSecondHalf(todayISO())); // 年間集計は下期のみ
+  // 申請権限者のみ「ポイント申請」タブを表示
+  let canApply = false;
+  try { canApply = await canApplyName(myName); } catch { canApply = false; }
+  $('tabApply').classList.toggle('hidden', !canApply);
+  $('whoami').textContent = myName;
+  $('secSeason').classList.remove('hidden');
+  switchTab('tabSeason');
+  scheduleShootingStar();
+  refreshAdminLink();
+}
+async function dashSubmitNewPassword() {
+  const p1 = $('dashNpw1').value, p2 = $('dashNpw2').value, msg = $('dashNpwMsg');
+  if ((p1 || '').length < 8) { msg.className = 'msg ngmsg'; msg.textContent = 'パスワードは8文字以上で設定してください'; return; }
+  if (p1 !== p2) { msg.className = 'msg ngmsg'; msg.textContent = '確認用パスワードが一致しません'; return; }
+  const { error } = await sb.auth.updateUser({ password: p1 });
+  if (error) { msg.className = 'msg ngmsg'; msg.textContent = '設定に失敗しました: ' + error.message; return; }
+  try { await sb.rpc('l1_clear_member_must_reset'); } catch {}
+  $('dashNpw1').value = ''; $('dashNpw2').value = '';
+  await enterDashboard();
+}
+async function dashLogout() { await sb.auth.signOut(); location.reload(); }
 
 function switchTab(tab) {
   const map = [['tabSeason','secSeason'],['tabAnnual','secAnnual'],['tabCriteria','secCriteria'],['tabApply','secApply']];
   for (const [btn, sec] of map) { $(btn).classList.toggle('active', btn === tab); $(sec).classList.toggle('hidden', btn !== tab); }
   if (tab === 'tabAnnual') renderAnnual();
   if (tab === 'tabCriteria') renderCriteria();
-  if (tab === 'tabApply') refreshApplyGate();
+  if (tab === 'tabApply') { applyView('form'); loadMembersIntoForm(); }
 }
 
 // 都市スカイライン生成（ネオン・シンセウェーブ調をSVGで。参考画像の雰囲気＝暗いビル+ネオン輪郭+発光窓+ライトビーム+水面反射）
@@ -759,27 +815,27 @@ function scheduleShootingStar() {
 
 async function init() {
   $('trophyImg').src = TROPHY;
+  initEye('dashLgEye', 'dashLgPass');
+  initEye('dashNpw1Eye', 'dashNpw1');
+  initEye('dashNpw2Eye', 'dashNpw2');
+  await populateLoginNames();
+  // イベント登録（本体はログイン後に表示）
+  $('tabSeason').addEventListener('click', () => switchTab('tabSeason'));
+  $('tabAnnual').addEventListener('click', () => switchTab('tabAnnual'));
+  $('tabCriteria').addEventListener('click', () => switchTab('tabCriteria'));
+  $('tabApply').addEventListener('click', () => switchTab('tabApply'));
+  $('apRule').addEventListener('change', updateApPreview);
+  $('apSubmit').addEventListener('click', submitRequest);
+  $('dashLgBtn').addEventListener('click', dashLogin);
+  $('dashLgPass').addEventListener('keydown', e => { if (e.key === 'Enter') dashLogin(); });
+  $('dashNpwBtn').addEventListener('click', dashSubmitNewPassword);
+  $('logoutLink').addEventListener('click', e => { e.preventDefault(); dashLogout(); });
+  // 既存セッションがあれば自動ログイン（在籍チェックあり）
   try {
-    await loadAll();
-    $('loading').classList.add('hidden');
-    renderStandings(); renderApplyForm();
-    $('tabAnnual').classList.toggle('hidden', !isSecondHalf(todayISO())); // 年間集計は下期のみ
-    $('secSeason').classList.remove('hidden');
-    scheduleShootingStar();
-    $('tabSeason').addEventListener('click', () => switchTab('tabSeason'));
-    $('tabAnnual').addEventListener('click', () => switchTab('tabAnnual'));
-    $('tabCriteria').addEventListener('click', () => switchTab('tabCriteria'));
-    $('tabApply').addEventListener('click', () => switchTab('tabApply'));
-    $('apRule').addEventListener('change', updateApPreview);
-    $('apSubmit').addEventListener('click', submitRequest);
-    $('lgBtn').addEventListener('click', applyLogin);
-    $('denyLogout').addEventListener('click', applyLogout);
-    $('logoutLink').addEventListener('click', e => { e.preventDefault(); applyLogout(); });
-    loadSession();
-    refreshAdminLink();
+    const { data: { user } } = await sb.auth.getUser();
+    if (user) await dashAfterAuth();
   } catch (e) {
-    $('loading').classList.add('hidden');
-    showErr('データの取得に失敗しました。config.jsのanonキー設定とスキーマ適用を確認してください。\n' + (e?.message ?? e));
+    showErr('初期化に失敗しました。\n' + (e?.message ?? e));
   }
 }
 init();
