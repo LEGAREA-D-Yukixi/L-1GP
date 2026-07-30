@@ -97,7 +97,7 @@
       <button data-tab="tabEvents">申請履歴</button>
       <button data-tab="tabIndividual" id="tabIndividualBtn" class="hidden">個人成績</button>
       <button data-tab="tabMaster">マスタ</button>
-      <button data-tab="tabAdmins">管理者</button>
+      <button data-tab="tabAdmins" id="tabAdminsBtn">管理者</button>
       <button data-tab="tabApplicants">申請者</button>
       <button data-tab="tabMembers">メンバー</button>
     </div>
@@ -234,7 +234,7 @@ const gmsg = (okFlag, text) => flash($('gMsg'), okFlag, text);
 // ---------- 認証（氏名＋パスワード / 内部は Supabase Auth） ----------
 async function populateAdminNames() {
   try {
-    const { data } = await sb.rpc('l1_special_admin_names');
+    const { data } = await sb.rpc('l1_admin_names');
     const names = Array.isArray(data) ? data : [];
     const sel = $('lgName');
     if (sel) sel.innerHTML = '<option value="">氏名を選択</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
@@ -262,14 +262,6 @@ async function afterAuth() {
     await sb.auth.signOut();
     return;
   }
-  // 管理画面は特別権限（個人成績の閲覧可）のみ利用可
-  let special = false;
-  try { const { data } = await sb.rpc('l1_can_view_individual'); special = !!data; } catch { special = false; }
-  if (!special) {
-    flash($('lgMsg'), false, 'この画面は特別権限者のみ利用できます。');
-    await sb.auth.signOut();
-    return;
-  }
   state.user = user;
   // 初回ログインはパスワード再設定を強制
   let mustReset = false;
@@ -287,6 +279,7 @@ async function enterAdmin() {
   $('adminUI').classList.remove('hidden');
   try { const { data } = await sb.rpc('l1_can_view_individual'); state.canIndividual = !!data; } catch { state.canIndividual = false; }
   $('tabIndividualBtn').classList.toggle('hidden', !state.canIndividual);
+  $('tabAdminsBtn').classList.toggle('hidden', !state.canIndividual);
   await reloadAll();
   const me = (state.admins || []).find(a => a.user_id === state.user?.id);
   $('whoami').textContent = 'ログイン中: ' + (me?.lark_name || state._loginName || state.user?.email || '');
