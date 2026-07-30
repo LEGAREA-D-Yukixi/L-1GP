@@ -202,14 +202,13 @@
     <!-- メンバー名簿 -->
     <section id="tabMembers" class="card hidden">
       <div class="row" style="justify-content:space-between; align-items:center">
-        <h2 style="margin:0">メンバー名簿（Larkメール↔氏名）</h2>
+        <h2 style="margin:0">メンバー名簿</h2>
         <button class="btn sm" id="larkSyncBtn">Larkから同期</button>
       </div>
-      <div class="muted" style="margin:8px 0">Larkのメールと氏名を登録すると、申請ページの「申請者名」が自動入力され、「ポイント獲得者名」が氏名のプルダウンになります。「Larkから同期」で組織メンバーを自動取り込み（氏名は必須、メールは取得できた人のみ・毎日自動同期）。メールが取れていない人はメール欄に入力するとログインできるようになります。</div>
+      <div class="muted" style="margin:8px 0">氏名（と所属Division）を登録します。「Larkから同期」で組織メンバーを自動取り込み（氏名は必須・毎日自動同期）。ログイン用アカウントは氏名ベースで発行されます。</div>
       <div id="memBody"></div>
       <div class="row" style="margin-top:10px; align-items:flex-end">
         <div><label>氏名</label><input id="newMemName" type="text" placeholder="山田 太郎"></div>
-        <div><label>Larkメール</label><input id="newMemEmail" type="email" placeholder="member@legarea.jp"></div>
         <div><label>所属Division（任意）</label><select id="newMemDiv"></select></div>
         <div style="flex:0"><button class="btn sm" id="newMemBtn">追加</button></div>
       </div>
@@ -739,11 +738,10 @@ function divOptions(selected) {
 function renderMembers() {
   const list = state.members || [];
   $('newMemDiv').innerHTML = divOptions('');
-  $('memBody').innerHTML = `<table><thead><tr><th>氏名</th><th>Larkメール</th><th>所属Division</th><th>取得元</th><th>状態</th><th></th></tr></thead><tbody>` +
+  $('memBody').innerHTML = `<table><thead><tr><th>氏名</th><th>所属Division</th><th>取得元</th><th>状態</th><th></th></tr></thead><tbody>` +
     (list.length ? list.map(m => `
       <tr>
         <td><input value="${esc(m.name)}" id="mn-${m.id}" style="min-width:110px"></td>
-        <td><input value="${esc(m.email ?? '')}" id="me-${m.id}" type="email" placeholder="未取得（入力でログイン可）" style="min-width:180px"></td>
         <td><select id="md-${m.id}" style="min-width:120px">${divOptions(m.division_id)}</select></td>
         <td>${m.open_id ? '<span class="badge on">Lark</span>' : '<span class="badge">手動</span>'}</td>
         <td><label style="font-weight:600"><input type="checkbox" id="ma-${m.id}" ${m.is_active ? 'checked' : ''} style="width:auto"> 有効</label></td>
@@ -751,30 +749,27 @@ function renderMembers() {
           <button class="btn sm gray" data-savemem="${m.id}">保存</button>
           <button class="btn sm red" data-delmem="${m.id}">削除</button>
         </td>
-      </tr>`).join('') : '<tr><td colspan="6" class="muted">まだメンバーが登録されていません。「Larkから同期」で取り込むか、下のフォームで追加してください。</td></tr>') + '</tbody></table>';
+      </tr>`).join('') : '<tr><td colspan="5" class="muted">まだメンバーが登録されていません。「Larkから同期」で取り込むか、下のフォームで追加してください。</td></tr>') + '</tbody></table>';
   $('memBody').querySelectorAll('[data-savemem]').forEach(b => b.addEventListener('click', () => saveMember(b.dataset.savemem)));
   $('memBody').querySelectorAll('[data-delmem]').forEach(b => b.addEventListener('click', () => delMember(b.dataset.delmem)));
 }
 async function addMember() {
   const name = $('newMemName').value.trim();
-  const email = $('newMemEmail').value.trim();
   const division_id = $('newMemDiv').value || null;
   if (!name) { gmsg(false, '氏名を入力してください'); return; }
-  if (!email) { gmsg(false, 'Larkメールを入力してください'); return; }
-  const { error } = await sb.from('l1_members').insert({ name, email, division_id });
-  if (error) { gmsg(false, /duplicate|unique/i.test(error.message) ? 'このメールは既に登録済みです' : ('追加に失敗: ' + error.message)); return; }
-  $('newMemName').value = ''; $('newMemEmail').value = '';
+  const { error } = await sb.from('l1_members').insert({ name, division_id });
+  if (error) { gmsg(false, '追加に失敗: ' + error.message); return; }
+  $('newMemName').value = '';
   gmsg(true, 'メンバーを追加しました');
   await reloadAll();
 }
 async function saveMember(id) {
   const name = $(`mn-${id}`).value.trim();
-  const email = $(`me-${id}`).value.trim() || null;
   const division_id = $(`md-${id}`).value || null;
   const is_active = $(`ma-${id}`).checked;
   if (!name) { gmsg(false, '氏名は必須です'); return; }
-  const { error } = await sb.from('l1_members').update({ name, email, division_id, is_active }).eq('id', id);
-  if (error) { gmsg(false, /duplicate|unique/i.test(error.message) ? 'このメールは他のメンバーと重複しています' : ('保存に失敗: ' + error.message)); return; }
+  const { error } = await sb.from('l1_members').update({ name, division_id, is_active }).eq('id', id);
+  if (error) { gmsg(false, '保存に失敗: ' + error.message); return; }
   gmsg(true, 'メンバーを保存しました');
   await reloadAll();
 }
