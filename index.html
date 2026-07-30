@@ -52,12 +52,21 @@
     box-shadow:0 0 8px 1px rgba(150,225,255,.75); transform-origin:left center; }
   .shooting::after { content:""; position:absolute; right:-3px; top:-2px; width:6px; height:6px; border-radius:50%;
     background:#fff; box-shadow:0 0 10px 3px rgba(180,235,255,.95); }
-  /* 巨大隕石（1000分の1でゆっくり出現） */
-  .meteor { position:absolute; height:6px; width:280px; border-radius:6px; opacity:0; transform-origin:left center;
-    background:linear-gradient(90deg, rgba(255,210,140,0) 0%, rgba(255,200,120,.5) 55%, #fff3d6 100%);
-    box-shadow:0 0 18px 4px rgba(255,190,120,.7); }
-  .meteor::after { content:""; position:absolute; right:-14px; top:-13px; width:32px; height:32px; border-radius:50%;
-    background:#fff; box-shadow:0 0 30px 12px rgba(255,205,135,.9), 0 0 70px 26px rgba(255,150,70,.5); }
+  /* 巨大隕石（1000分の1で出現・地獄の炎玉／画面の約1/3） */
+  .meteor { position:absolute; opacity:0; transform-origin:left center; pointer-events:none; will-change:transform,opacity; }
+  .meteor .met-tail { position:absolute; left:0; top:50%; transform:translateY(-50%); border-radius:50%;
+    background:linear-gradient(90deg, rgba(255,60,0,0) 0%, rgba(190,25,0,.30) 26%, rgba(255,85,10,.55) 58%, rgba(255,175,70,.9) 100%);
+    filter:blur(8px); animation:met-wobble .5s ease-in-out infinite alternate; }
+  .meteor .met-orb { position:absolute; right:0; top:0; border-radius:50%;
+    background:radial-gradient(circle at 42% 38%, #fff7e0 0%, #ffe37a 9%, #ffb020 22%, #ff5a00 40%, #e02200 58%, #7a0f00 80%, #240400 100%);
+    box-shadow:0 0 60px 18px rgba(255,120,30,.8), 0 0 160px 60px rgba(255,50,0,.55), 0 0 300px 140px rgba(150,15,0,.42);
+    animation:met-pulse .9s ease-in-out infinite alternate; }
+  .meteor .met-core { position:absolute; left:29%; top:25%; width:44%; height:44%; border-radius:50%;
+    background:radial-gradient(circle, #fffef7 0%, #ffe9a8 46%, rgba(255,190,70,0) 74%);
+    mix-blend-mode:screen; animation:met-flicker .13s steps(2) infinite; }
+  @keyframes met-pulse { from{ filter:brightness(1) } to{ filter:brightness(1.2) } }
+  @keyframes met-flicker { 0%{ opacity:.85; transform:scale(1) } 50%{ opacity:1; transform:scale(1.09) } 100%{ opacity:.9; transform:scale(.96) } }
+  @keyframes met-wobble { from{ transform:translateY(-56%) scaleY(.88) } to{ transform:translateY(-44%) scaleY(1.14) } }
   .wrap { max-width:1080px; margin:0 auto; padding:16px 24px 84px; position:relative; z-index:1; }
   .admin-link { position:absolute; top:14px; right:16px; z-index:5; background:linear-gradient(90deg,var(--cyan),#1b8fd6); color:#06122e; font-weight:900; font-size:13px; padding:8px 14px; border-radius:10px; text-decoration:none; box-shadow:0 0 16px rgba(53,200,255,.45); }
   .admin-link:hover { filter:brightness(1.08); }
@@ -792,22 +801,46 @@ function spawnShootingStar() {
 function spawnMeteor() {
   const layer = $('shootingLayer');
   if (!layer) return;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const head = Math.min(vw, vh) * 0.66;      // 炎玉の直径（画面の約2/3）
+  const tail = head * 2.4;                    // 尾を引く炎
+  const W = tail + head, H = head;
+
   const m = document.createElement('div');
   m.className = 'meteor';
-  const vw = window.innerWidth, vh = window.innerHeight;
-  const startX = -220 + Math.random() * vw * 0.3;   // 画面左上あたりから
-  const startY = -120 + Math.random() * vh * 0.25;
-  const angle = 20 + Math.random() * 22;             // 緩やかな下降
-  const dist = (vw + vh) * (0.95 + Math.random() * 0.3);
+  m.style.width = W + 'px';
+  m.style.height = H + 'px';
+
+  const tailEl = document.createElement('div');
+  tailEl.className = 'met-tail';
+  tailEl.style.width = (W - head * 0.42) + 'px';
+  tailEl.style.height = (head * 0.36) + 'px';
+
+  const orb = document.createElement('div');
+  orb.className = 'met-orb';
+  orb.style.width = head + 'px';
+  orb.style.height = head + 'px';
+
+  const core = document.createElement('div');
+  core.className = 'met-core';
+  orb.appendChild(core);
+  m.appendChild(tailEl);
+  m.appendChild(orb);
+
+  const angle = 22 + Math.random() * 16;                 // 緩い下降 22〜38°
+  const startX = -W + head * 0.2 + Math.random() * vw * 0.15;   // 炎玉が左上あたりから
+  const startY = -head * 0.4 + Math.random() * vh * 0.12;
+  const dist = (vw + vh) * (1.05 + Math.random() * 0.25);
   m.style.left = startX + 'px';
   m.style.top = startY + 'px';
   layer.appendChild(m);
+
   m.animate([
-    { transform: `rotate(${angle}deg) translateX(0) scale(1)`, opacity: 0 },
-    { opacity: 1, offset: 0.10 },
-    { opacity: 1, offset: 0.86 },
-    { transform: `rotate(${angle}deg) translateX(${dist}px) scale(1.15)`, opacity: 0 },
-  ], { duration: 7000 + Math.random() * 3000, easing: 'linear' }).onfinish = () => m.remove();  // ゆっくり(7〜10秒)
+    { transform: `rotate(${angle}deg) translateX(0) scale(.9)`, opacity: 0 },
+    { opacity: 1, offset: 0.12 },
+    { opacity: 1, offset: 0.85 },
+    { transform: `rotate(${angle}deg) translateX(${dist}px) scale(1.28)`, opacity: 0 },
+  ], { duration: 7500 + Math.random() * 3000, easing: 'linear' }).onfinish = () => m.remove();  // ゆっくり(7.5〜10.5秒)
 }
 function scheduleShootingStar() {
   const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
