@@ -357,7 +357,7 @@ import {
   validateRequestInput, groupRules, buildFeed, formatPoints, seasonBaseline, pointsBar, pyramidWidth, annualTermLabel, rankGaps, leadOverSecond,
   fiscalTerm, isSecondHalf, seasonCountdown,
 } from './l1-core.js';
-import { ICON_DATA, TROPHY } from './l1-icons.js';
+import { ICON_DATA, TROPHY, DEFAULT_ICON } from './l1-icons.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = id => document.getElementById(id);
@@ -495,7 +495,7 @@ function renderFeed(key = 'feed') {
     ? '<div class="muted" style="padding:12px 0">まだ記録がありません。</div>'
     : slice.map(f => `
       <div class="feeditem">
-        <div class="left">${iconImg(f.category,'fi')}<span class="ftext"><span class="date">${esc(f.occurred_on)}</span><b>${esc(f.division_name)}</b>　${esc(f.category)}<span class="muted">（${esc(f.label)}）</span></span></div>
+        <div class="left">${iconImg(f.category,'fi') || `<img class="fi" src="${DEFAULT_ICON}" alt="">`}<span class="ftext"><span class="date">${esc(f.occurred_on)}</span><b>${esc(f.division_name)}</b>　${esc(f.category)}<span class="muted">（${esc(f.label)}）</span></span></div>
         <div class="fpt ${f.kind === 'add' ? 'add' : 'deduct'}">${esc(f.points_label)} L</div>
       </div>`).join('');
   // 番号ページャ（中央下部）
@@ -545,7 +545,7 @@ function renderCriteria() {
   const g = groupRules(state.rules);
   const row = r => `
     <div class="critrow">
-      ${iconImg(r.category,'ci') || '<span class="ci"></span>'}
+      ${iconImg(r.category,'ci') || `<img class="ci" src="${DEFAULT_ICON}" alt="">`}
       <div><div class="clabel">${esc(r.category)}</div><div class="cdesc">${esc(r.label)}</div></div>
       <div class="cpt ${r.kind}">${r.is_variable ? '±XXX L' : `${formatPoints(r.points)} L`}</div>
     </div>`;
@@ -578,7 +578,7 @@ function updateApPreview() {
   if (!r) { pv.classList.add('hidden'); return; }
   pv.classList.remove('hidden');
   pv.innerHTML = `<div class="critrow" style="border:1px solid var(--line-soft);border-radius:10px">
-    ${iconImg(r.category,'ci') || '<span class="ci"></span>'}
+    ${iconImg(r.category,'ci') || `<img class="ci" src="${DEFAULT_ICON}" alt="">`}
     <div><div class="clabel">${esc(r.category)}</div><div class="cdesc">${esc(r.label)}</div></div>
     <div class="cpt ${r.kind}">${r.is_variable ? '±XXX L' : `${formatPoints(r.points)} L`}</div></div>`;
 }
