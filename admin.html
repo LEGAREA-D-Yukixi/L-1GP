@@ -272,7 +272,7 @@ async function afterAuth() {
   state.user = user;
   // 初回ログインはパスワード再設定を強制
   let mustReset = false;
-  try { const { data } = await sb.rpc('l1_my_must_reset'); mustReset = !!data; } catch { mustReset = false; }
+  try { const { data } = await sb.rpc('l1_my_member_must_reset'); mustReset = !!data; } catch { mustReset = false; }
   if (mustReset) {
     $('loginCard').classList.add('hidden');
     $('resetCard').classList.remove('hidden');
@@ -296,7 +296,7 @@ async function submitNewPassword() {
   if (p1 !== p2) { flash($('npwMsg'), false, '確認用パスワードが一致しません'); return; }
   const { error } = await sb.auth.updateUser({ password: p1 });
   if (error) { flash($('npwMsg'), false, '設定に失敗しました: ' + error.message); return; }
-  try { await sb.rpc('l1_clear_must_reset'); } catch {}
+  try { await sb.rpc('l1_clear_member_must_reset'); } catch {}
   $('npw1').value = ''; $('npw2').value = '';
   flash($('npwMsg'), true, 'パスワードを更新しました');
   await enterAdmin();
