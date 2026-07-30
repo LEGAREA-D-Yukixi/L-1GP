@@ -425,7 +425,7 @@ function renderPyramid(container, rows, baseline) {
       <div class="medallion ${mcls}${big}${deco}">${badge}</div>
       <div class="pinfo">
         <div class="pinfo-top">
-          <div class="nm">${esc(r.name)}${isChamp ? '<span class="champ-tag">王者</span>' : ''}${isLast ? '<span class="last-tag">最下位</span>' : ''}</div>
+          <div class="nm">${esc(r.name)}${isLast ? '<span class="last-tag">最下位</span>' : ''}</div>
           <div class="val"><div class="pt">${r.points.toLocaleString()}<span style="font-size:14px"> L</span></div></div>
         </div>
         <div class="mini"><div class="f ${fillCls}" style="width:${bar.fillPct}%"></div><div class="c" style="left:${bar.centerPct}%"></div></div>
