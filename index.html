@@ -614,12 +614,12 @@ async function submitRequest() {
 }
 
 // メンバー名簿を読み込み: 申請者名の自動入力（ログイン氏名）＋獲得者プルダウン
+let formMembers = []; // {name, division_id}
 async function loadMembersIntoForm() {
-  let names = [];
   try {
-    const { data: rows } = await sb.from('l1_member_names').select('name,is_active').order('name');
-    names = (rows || []).filter(r => r.is_active !== false).map(r => r.name).filter(Boolean);
-  } catch { /* 名簿取得失敗でもフォールバックで動作 */ }
+    const { data: rows } = await sb.from('l1_member_names').select('name,is_active,division_id').order('name');
+    formMembers = (rows || []).filter(r => r.is_active !== false && r.name);
+  } catch { formMembers = []; }
   const myName = (loginSession && loginSession.name) ? loginSession.name : '';
 
   // 申請者名: ログイン氏名を自動入力＆読取専用
@@ -627,15 +627,19 @@ async function loadMembersIntoForm() {
   if (myName) { nameEl.value = myName; nameEl.readOnly = true; nameEl.style.opacity = '.85'; }
   else { nameEl.readOnly = false; nameEl.style.opacity = ''; }
 
-  // 獲得者名: 名簿があればプルダウン、無ければテキスト入力
+  populateEarnerByDivision();
+}
+// 獲得者プルダウン: 選択中のDivisionに所属するメンバーのみ表示
+function populateEarnerByDivision() {
   const sel = $('apEarnerSel'), txt = $('apEarner');
-  if (names.length) {
-    const uniq = [...new Set(names)];
-    sel.innerHTML = '<option value="">選択してください</option>' + uniq.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
-    sel.classList.remove('hidden'); txt.classList.add('hidden');
-  } else {
-    sel.classList.add('hidden'); txt.classList.remove('hidden');
+  const divId = $('apDivision') ? $('apDivision').value : '';
+  if (!formMembers.length) { // 名簿が取れない場合はテキスト入力にフォールバック
+    sel.classList.add('hidden'); txt.classList.remove('hidden'); return;
   }
+  const names = [...new Set(formMembers.filter(m => divId && m.division_id === divId).map(m => m.name))];
+  const placeholder = divId ? '選択してください' : '先にDivisionを選択';
+  sel.innerHTML = `<option value="">${placeholder}</option>` + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  sel.classList.remove('hidden'); txt.classList.add('hidden');
 }
 
 // ---------- 申請の認証・権限ゲート ----------
@@ -825,6 +829,7 @@ async function init() {
   $('tabCriteria').addEventListener('click', () => switchTab('tabCriteria'));
   $('tabApply').addEventListener('click', () => switchTab('tabApply'));
   $('apRule').addEventListener('change', updateApPreview);
+  $('apDivision').addEventListener('change', populateEarnerByDivision);
   $('apSubmit').addEventListener('click', submitRequest);
   $('dashLgBtn').addEventListener('click', dashLogin);
   $('dashLgPass').addEventListener('keydown', e => { if (e.key === 'Enter') dashLogin(); });
