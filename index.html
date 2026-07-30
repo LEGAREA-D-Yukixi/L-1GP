@@ -427,7 +427,7 @@ function renderStandings() {
   if (!season) { $('standingsBody').innerHTML = '<div class="card muted">シーズンがありません</div>'; return; }
   state.selectedSeasonId = season.id;
   const eventsBySeason = new Map(state.seasons.map(s => [s.id, state.events.filter(e => e.season_id === s.id)]));
-  const rows = calcStandingsCarry({ season, seasons:state.seasons, divisions:state.divisions.filter(d=>d.is_active!==false), eventsBySeason });
+  const rows = calcStandingsCarry({ season, seasons:state.seasons, divisions:state.divisions.filter(d=>d.is_active!==false&&d.in_ranking!==false), eventsBySeason });
   const baseline = seasonBaseline({ season, seasons:state.seasons });
   const blackout = isBlackout(season, todayISO());
   const term = fiscalTerm(todayISO());
@@ -521,7 +521,7 @@ function renderAnnual() {
     return;
   }
   const eventsBySeason = new Map(state.seasons.map(s => [s.id, state.events.filter(e => e.season_id === s.id)]));
-  const rows = calcAnnualStandings({ cycle, seasons:state.seasons, divisions:state.divisions.filter(d=>d.is_active!==false), eventsBySeason });
+  const rows = calcAnnualStandings({ cycle, seasons:state.seasons, divisions:state.divisions.filter(d=>d.is_active!==false&&d.in_ranking!==false), eventsBySeason });
   const baseline = seasonBaseline({ season, seasons:state.seasons });
   renderPyramid($('annualBody'), rows, baseline);
   renderFeed('annualFeed');
@@ -548,7 +548,7 @@ function renderCriteria() {
 
 function renderApplyForm() {
   $('apDivision').innerHTML = '<option value="">選択してください</option>' +
-    state.divisions.filter(d => d.is_active !== false).map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
+    state.divisions.filter(d => d.is_active !== false && d.in_ranking !== false).map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
   const g = groupRules(state.rules);
   const opt = r => `<option value="${r.id}">${esc(r.category)}｜${esc(r.label)}${r.is_variable ? '（pt都度設定）' : `（${formatPoints(r.points)}L）`}</option>`;
   $('apRule').innerHTML = '<option value="">選択してください</option>' +

@@ -309,7 +309,7 @@ async function reloadAll() {
     sb.from('l1_divisions').select('*').order('display_order'),
     sb.from('l1_seasons').select('*').order('starts_on'),
     sb.from('l1_rules').select('*').order('display_order'),
-    sb.from('l1_requests').select('*').eq('status', 'pending').order('created_at'),
+    sb.from('l1_requests').select('*').in('status', ['pending', 'pending_final']).order('created_at'),
     sb.from('l1_events_full').select('*').order('occurred_on', { ascending: false }).limit(2000),
     sb.from('l1_admins').select('*').order('created_at'),
     sb.from('l1_applicants').select('*').order('created_at'),
@@ -330,15 +330,29 @@ function renderAll() {
 const dName = id => state.divisions.find(d => d.id === id)?.name ?? '(不明)';
 const rOf = id => state.rules.find(r => r.id === id);
 
-// ---------- 申請承認 ----------
+// ---------- 申請承認（二段階：通常承認→特別承認） ----------
 function renderRequests() {
   $('pendingCount').textContent = state.requests.length;
   if (state.requests.length === 0) { $('reqBody').innerHTML = '<div class="muted">承認待ちの申請はありません。</div>'; return; }
-  $('reqBody').innerHTML = `<table><thead><tr><th>申請日</th><th>発生日</th><th>Division</th><th>項目</th><th>pt</th><th>獲得者</th><th>申請者</th><th>詳細</th><th></th></tr></thead><tbody>` +
+  const sp = !!state.canIndividual; // 特別管理者か
+  $('reqBody').innerHTML = `<table><thead><tr><th>状態</th><th>申請日</th><th>発生日</th><th>Division</th><th>項目</th><th>pt</th><th>獲得者</th><th>申請者</th><th>詳細</th><th></th></tr></thead><tbody>` +
     state.requests.map(q => {
       const r = rOf(q.rule_id);
       const variable = !!r?.is_variable;
+      const isFinal = q.status === 'pending_final';
+      const statusBadge = isFinal ? '<span class="badge on">特別承認待ち</span>' : '<span class="badge">承認待ち</span>';
+      // ボタン: pending=誰でも承認（通常→特別承認へ / 特別→確定）, pending_final=特別管理者のみ確定
+      let actions = '';
+      if (!isFinal) {
+        actions = `<button class="btn sm" data-approve="${q.id}">${sp ? '承認（確定）' : '承認（特別承認へ）'}</button>`;
+      } else if (sp) {
+        actions = `<button class="btn sm" data-approve="${q.id}">特別承認（確定）</button>`;
+      } else {
+        actions = `<span class="muted" style="font-size:12px">特別管理者の承認待ち</span>`;
+      }
+      actions += `<button class="btn sm red" data-reject="${q.id}">却下</button>`;
       return `<tr>
+        <td style="white-space:nowrap">${statusBadge}</td>
         <td class="muted" style="white-space:nowrap">${q.created_at ? esc(new Date(q.created_at).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })) : ''}</td>
         <td>${esc(q.occurred_on)}</td>
         <td>${esc(dName(q.division_id))}</td>
@@ -349,12 +363,10 @@ function renderRequests() {
         <td>${esc(q.earner_name ?? '')}</td>
         <td>${esc(q.requester_name)}</td>
         <td class="muted" style="max-width:220px">${esc(q.note ?? '')}</td>
-        <td style="white-space:nowrap">
-          <button class="btn sm" data-approve="${q.id}">承認</button>
-          <button class="btn sm red" data-reject="${q.id}">却下</button>
-        </td>
+        <td style="white-space:nowrap">${actions}</td>
       </tr>`;
-    }).join('') + '</tbody></table>';
+    }).join('') + '</tbody></table>'
+    + '<div class="muted" style="margin-top:6px">通常管理者の承認で「特別承認待ち」になり、特別管理者へ通知されます。特別管理者が承認するとダッシュボードへ反映されます。</div>';
 
   $('reqBody').querySelectorAll('[data-approve]').forEach(b => b.addEventListener('click', () => review(b.dataset.approve, 'approve')));
   $('reqBody').querySelectorAll('[data-reject]').forEach(b => b.addEventListener('click', () => review(b.dataset.reject, 'reject')));
@@ -372,14 +384,17 @@ async function review(id, action) {
   const p_comment = action === 'reject' ? (prompt('却下理由（任意）') ?? null) : null;
   const { error } = await sb.rpc('l1_review_request', { p_request_id: id, p_action: action, p_points, p_comment });
   if (error) { gmsg(false, '処理に失敗: ' + error.message); return; }
-  gmsg(true, action === 'approve' ? '承認しました（ダッシュボードへ反映されます）' : '却下しました');
+  const msg = action === 'reject' ? '却下しました'
+    : (q?.status === 'pending_final' || state.canIndividual) ? '承認しました（ダッシュボードへ反映されます）'
+    : '1次承認しました（特別管理者へ通知しました）';
+  gmsg(true, msg);
   await reloadAll();
 }
 
 // ---------- 直接登録 ----------
 function renderDirectForm() {
   $('dcDivision').innerHTML = '<option value="">選択</option>' +
-    state.divisions.filter(d => d.is_active !== false).map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
+    state.divisions.filter(d => d.is_active !== false && d.in_ranking !== false).map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
   const g = groupRules(state.rules);
   const opt = r => `<option value="${r.id}">${esc(r.category)}｜${esc(r.label)}${r.is_variable ? '（pt都度設定）' : `（${formatPoints(r.points)}L）`}</option>`;
   $('dcRule').innerHTML = '<option value="">選択</option>' +
@@ -629,7 +644,7 @@ function memberNameOptions(selectedName) {
     names.map(n => `<option value="${esc(n)}" ${n === selectedName ? 'selected' : ''}>${esc(n)}</option>`).join('');
 }
 function renderAdmins() {
-  $('admBody').innerHTML = `<table><thead><tr><th>メール</th><th>Lark通知先（氏名）</th><th style="text-align:center">個人成績の閲覧</th><th></th></tr></thead><tbody>` +
+  $('admBody').innerHTML = `<table><thead><tr><th>メール</th><th>Lark通知先（氏名）</th><th>所属Division</th><th style="text-align:center">個人成績の閲覧</th><th></th></tr></thead><tbody>` +
     state.admins.map(a => `
       <tr>
         <td>${esc(a.email ?? a.user_id)}<div class="muted" style="font-size:11px">${esc((a.created_at || '').slice(0, 10))}</div></td>
@@ -637,13 +652,14 @@ function renderAdmins() {
           <select id="al-${a.user_id}" style="min-width:150px">${memberNameOptions(a.lark_name)}</select>
           ${a.open_id ? '<span class="badge on" style="margin-left:6px">紐付け済</span>' : '<span class="badge" style="margin-left:6px">未紐付け</span>'}
         </td>
+        <td><select id="adv-${a.user_id}" style="min-width:120px">${divOptions(a.division_id)}</select></td>
         <td style="text-align:center">${a.can_view_individual ? '<span class="badge on">許可</span>' : '<span class="badge">なし</span>'}</td>
         <td style="white-space:nowrap">
           <button class="btn sm gray" data-savelark="${a.user_id}">保存</button>
           ${a.user_id === state.user?.id ? '<span class="muted">自分</span>' : `<button class="btn sm red" data-deladm="${a.user_id}">削除</button>`}
         </td>
       </tr>`).join('') + '</tbody></table>'
-    + '<div class="muted" style="margin-top:6px">Lark通知先は「メンバー名簿」の氏名から選びます（Lark同期で open_id が入っている人が対象）。個人成績の閲覧権限の付与・解除はデータベース（l1_admins.can_view_individual）でのみ変更できます。</div>';
+    + '<div class="muted" style="margin-top:6px">Lark通知先は「メンバー名簿」の氏名から選びます（Lark同期で open_id が入っている人が対象）。所属Divisionは「本社」も選べます。個人成績の閲覧権限の付与・解除はデータベース（l1_admins.can_view_individual）でのみ変更できます。</div>';
   $('admBody').querySelectorAll('[data-deladm]').forEach(b => b.addEventListener('click', () => delAdmin(b.dataset.deladm)));
   $('admBody').querySelectorAll('[data-savelark]').forEach(b => b.addEventListener('click', () => saveAdminLark(b.dataset.savelark)));
 }
@@ -652,9 +668,10 @@ async function saveAdminLark(user_id) {
   const m = (state.members || []).find(x => x.name === name && x.open_id);
   const open_id = m ? m.open_id : null;
   const lark_name = name || null;
-  const { error } = await sb.from('l1_admins').update({ open_id, lark_name }).eq('user_id', user_id);
-  if (error) { gmsg(false, 'Lark通知先の保存に失敗: ' + error.message); return; }
-  gmsg(true, open_id ? `Lark通知先を「${name}」に設定しました` : 'Lark通知先を未設定にしました');
+  const division_id = $(`adv-${user_id}`).value || null;
+  const { error } = await sb.from('l1_admins').update({ open_id, lark_name, division_id }).eq('user_id', user_id);
+  if (error) { gmsg(false, '保存に失敗: ' + error.message); return; }
+  gmsg(true, '管理者情報を保存しました');
   await reloadAll();
 }
 async function autoLinkAdmins() {
