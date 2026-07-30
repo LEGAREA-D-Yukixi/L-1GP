@@ -686,10 +686,8 @@ async function canApplyName(name) {
 }
 async function refreshAdminLink() {
   try {
-    const name = loginSession && loginSession.name;
-    let isAdmin = false;
-    if (name) { const { data } = await sb.rpc('l1_is_admin_name', { p_name: name }); isAdmin = !!data; }
-    $('adminLink').classList.toggle('hidden', !isAdmin);
+    const { data } = await sb.rpc('l1_can_view_individual');
+    $('adminLink').classList.toggle('hidden', !data);
   } catch { $('adminLink').classList.add('hidden'); }
 }
 async function dashLogin() {

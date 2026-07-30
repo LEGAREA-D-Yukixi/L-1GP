@@ -55,7 +55,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>🛠 L-1グランプリ 管理画面</h1>
+  <h1>L-1グランプリ 管理画面</h1>
 
   <!-- ログイン -->
   <div id="loginCard" class="card">
@@ -132,7 +132,7 @@
 
     <!-- 申請履歴 -->
     <section id="tabEvents" class="card hidden">
-      <h2>申請履歴（承認済みポイントの記録・打消し可能）</h2>
+      <h2>申請履歴</h2>
       <label>シーズン</label><select id="evSeason" style="max-width:280px"></select>
       <div id="evBody" style="margin-top:10px"></div>
     </section>
@@ -175,14 +175,10 @@
 
     <!-- 管理者 -->
     <section id="tabAdmins" class="card hidden">
-      <div class="row" style="justify-content:space-between; align-items:center">
-        <h2 style="margin:0">管理者一覧</h2>
-        <button class="btn sm gray" id="admAutoLinkBtn">メールでLark自動リンク</button>
-      </div>
-      <div class="muted" style="margin:8px 0">申請の通知はLarkのDMで届きます。各管理者の「Lark通知先」を氏名で紐付けてください（メールが一致する人は「自動リンク」で一括設定できます）。未紐付けの管理者にはDMが届きません。</div>
+      <h2>管理者一覧</h2>
       <div id="admBody"></div>
       <div class="row" style="margin-top:10px; align-items:flex-end">
-        <div><label>追加する管理者のメール</label><input id="newAdmEmail" type="email"></div>
+        <div><label>追加する管理者の氏名</label><select id="newAdmName" style="min-width:180px"></select></div>
         <div style="flex:0"><button class="btn sm" id="newAdmBtn">追加</button></div>
       </div>
     </section>
@@ -190,22 +186,20 @@
     <!-- 申請者 -->
     <section id="tabApplicants" class="card hidden">
       <h2>申請者（ポイント申請できる人）</h2>
-      <div class="muted" style="margin-bottom:8px">ここに登録したメールのアカウントだけがポイント申請ページを開いて申請できます（管理者は自動的に申請可）。</div>
+      <div class="muted" style="margin-bottom:8px">ここで申請権限を付与したメンバーだけがポイント申請ページを開いて申請できます（管理者は自動的に申請可）。氏名は「メンバー名簿」から選べます。</div>
       <div id="aplBody"></div>
       <div class="row" style="margin-top:10px; align-items:flex-end">
-        <div><label>申請を許可するメールアドレス</label><input id="newAplEmail" type="email" placeholder="member@legarea.jp"></div>
+        <div><label>申請権限を付与する氏名</label><select id="newAplName" style="min-width:180px"></select></div>
         <div style="flex:0"><button class="btn sm" id="newAplBtn">追加</button></div>
       </div>
-      <div class="muted" style="margin-top:8px">※ 本人はこのメールでログインできる必要があります（Authユーザー作成、または申請ページからのサインアップ）。</div>
     </section>
 
     <!-- メンバー名簿 -->
     <section id="tabMembers" class="card hidden">
       <div class="row" style="justify-content:space-between; align-items:center">
         <h2 style="margin:0">メンバー名簿</h2>
-        <button class="btn sm" id="larkSyncBtn">Larkから同期</button>
       </div>
-      <div class="muted" style="margin:8px 0">氏名（と所属Division）を登録します。「Larkから同期」で組織メンバーを自動取り込み（氏名は必須・毎日自動同期）。ログイン用アカウントは氏名ベースで発行されます。</div>
+      <div class="muted" style="margin:8px 0">氏名（と所属Division）を登録します。組織メンバーは毎日自動でLark同期されます（氏名は必須）。ログイン用アカウントは氏名ベースで発行されます。</div>
       <div id="memBody"></div>
       <div class="row" style="margin-top:10px; align-items:flex-end">
         <div><label>氏名</label><input id="newMemName" type="text" placeholder="山田 太郎"></div>
@@ -241,7 +235,7 @@ const gmsg = (okFlag, text) => flash($('gMsg'), okFlag, text);
 // ---------- 認証（氏名＋パスワード / 内部は Supabase Auth） ----------
 async function populateAdminNames() {
   try {
-    const { data } = await sb.rpc('l1_admin_names');
+    const { data } = await sb.rpc('l1_special_admin_names');
     const names = Array.isArray(data) ? data : [];
     const sel = $('lgName');
     if (sel) sel.innerHTML = '<option value="">氏名を選択</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
@@ -266,6 +260,14 @@ async function afterAuth() {
   const { data: isAdmin, error } = await sb.rpc('l1_is_admin');
   if (error || !isAdmin) {
     flash($('lgMsg'), false, 'このアカウントは管理者に登録されていません。');
+    await sb.auth.signOut();
+    return;
+  }
+  // 管理画面は特別権限（個人成績の閲覧可）のみ利用可
+  let special = false;
+  try { const { data } = await sb.rpc('l1_can_view_individual'); special = !!data; } catch { special = false; }
+  if (!special) {
+    flash($('lgMsg'), false, 'この画面は特別権限者のみ利用できます。');
     await sb.auth.signOut();
     return;
   }
@@ -452,10 +454,10 @@ function renderEvents() {
   const sid = $('evSeason').value || active?.id;
   const rows = state.events.filter(e => e.season_id === sid);
   if (rows.length === 0) { $('evBody').innerHTML = '<div class="muted">イベントはありません。</div>'; return; }
-  $('evBody').innerHTML = `<table><thead><tr><th>発生日</th><th>Division</th><th>項目</th><th>pt</th><th>理由・詳細</th><th>由来</th><th></th></tr></thead><tbody>` +
+  $('evBody').innerHTML = `<table><thead><tr><th>発生日時</th><th>Division</th><th>項目</th><th>pt</th><th>理由・詳細</th><th>由来</th><th></th></tr></thead><tbody>` +
     rows.map(e => `
       <tr class="${e.voided_at ? 'voided' : ''}">
-        <td>${esc(e.occurred_on)}</td>
+        <td class="muted" style="white-space:nowrap">${e.created_at ? esc(new Date(e.created_at).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })) : esc(e.occurred_on)}</td>
         <td>${esc(e.division_name)}</td>
         <td>${esc(e.category)}<span class="muted">｜${esc(e.label)}</span></td>
         <td class="${e.points >= 0 ? 'add' : 'deduct'}">${esc(formatPoints(e.points))}</td>
@@ -627,7 +629,7 @@ function renderIndividual() {
   rows.forEach((r, i) => { const rank = (i > 0 && rows[i - 1].pts === r.pts) ? ranked[i - 1].rank : i + 1; ranked.push({ ...r, rank }); });
 
   if (ranked.length === 0) {
-    $('indBody').innerHTML = '<div class="muted">メンバー名簿に登録がありません。「メンバー」タブで登録するか、Larkから同期してください。</div>';
+    $('indBody').innerHTML = '<div class="muted">メンバー名簿に登録がありません。「メンバー」タブで登録してください（毎日自動でLark同期されます）。</div>';
     return;
   }
   $('indBody').innerHTML = `<table><thead><tr><th>順位</th><th>獲得者</th><th>所属</th><th style="text-align:right">合計pt</th><th style="text-align:right">件数</th></tr></thead><tbody>` +
@@ -646,10 +648,10 @@ function memberNameOptions(selectedName) {
     names.map(n => `<option value="${esc(n)}" ${n === selectedName ? 'selected' : ''}>${esc(n)}</option>`).join('');
 }
 function renderAdmins() {
-  $('admBody').innerHTML = `<table><thead><tr><th>メール</th><th>Lark通知先（氏名）</th><th>所属Division</th><th style="text-align:center">個人成績の閲覧</th><th></th></tr></thead><tbody>` +
+  populateAddAdminNames();
+  $('admBody').innerHTML = `<table><thead><tr><th>氏名（Lark通知先）</th><th>所属Division</th><th style="text-align:center">個人成績の閲覧</th><th></th></tr></thead><tbody>` +
     state.admins.map(a => `
       <tr>
-        <td>${esc(a.email ?? a.user_id)}<div class="muted" style="font-size:11px">${esc((a.created_at || '').slice(0, 10))}</div></td>
         <td>
           <select id="al-${a.user_id}" style="min-width:150px">${memberNameOptions(a.lark_name)}</select>
           ${a.open_id ? '<span class="badge on" style="margin-left:6px">紐付け済</span>' : '<span class="badge" style="margin-left:6px">未紐付け</span>'}
@@ -660,8 +662,7 @@ function renderAdmins() {
           <button class="btn sm gray" data-savelark="${a.user_id}">保存</button>
           ${a.user_id === state.user?.id ? '<span class="muted">自分</span>' : `<button class="btn sm red" data-deladm="${a.user_id}">削除</button>`}
         </td>
-      </tr>`).join('') + '</tbody></table>'
-    + '<div class="muted" style="margin-top:6px">Lark通知先は「メンバー名簿」の氏名から選びます（Lark同期で open_id が入っている人が対象）。所属Divisionは「本社」も選べます。個人成績の閲覧権限の付与・解除はデータベース（l1_admins.can_view_individual）でのみ変更できます。</div>';
+      </tr>`).join('') + '</tbody></table>';
   $('admBody').querySelectorAll('[data-deladm]').forEach(b => b.addEventListener('click', () => delAdmin(b.dataset.deladm)));
   $('admBody').querySelectorAll('[data-savelark]').forEach(b => b.addEventListener('click', () => saveAdminLark(b.dataset.savelark)));
 }
@@ -676,21 +677,23 @@ async function saveAdminLark(user_id) {
   gmsg(true, '管理者情報を保存しました');
   await reloadAll();
 }
-async function autoLinkAdmins() {
-  $('admAutoLinkBtn').disabled = true;
-  const { data, error } = await sb.rpc('l1_link_admins_open_id');
-  $('admAutoLinkBtn').disabled = false;
-  if (error) { gmsg(false, '自動リンクに失敗: ' + error.message); return; }
-  gmsg(true, `メール一致で ${data ?? 0} 件の管理者をLarkに紐付けました。残りは氏名で手動設定してください。`);
-  await reloadAll();
+function populateAddAdminNames() {
+  const nrm = s => String(s || '').replace(/[\s　]/g, '');
+  const adminNames = new Set((state.admins || []).map(a => nrm(a.lark_name)));
+  const names = [...new Set((state.members || [])
+    .filter(m => m.is_active !== false && m.name && !adminNames.has(nrm(m.name)))
+    .map(m => m.name))].sort((a, b) => String(a).localeCompare(String(b), 'ja'));
+  const sel = $('newAdmName'); if (!sel) return;
+  sel.innerHTML = names.length
+    ? '<option value="">選択してください</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')
+    : '<option value="">追加できるメンバーがいません</option>';
 }
 async function addAdmin() {
-  const email = $('newAdmEmail').value.trim();
-  if (!email) { gmsg(false, 'メールアドレスを入力してください'); return; }
-  const { error } = await sb.rpc('l1_add_admin', { p_email: email });
+  const name = $('newAdmName').value;
+  if (!name) { gmsg(false, '氏名を選択してください'); return; }
+  const { error } = await sb.rpc('l1_add_admin_by_name', { p_name: name });
   if (error) { gmsg(false, '追加に失敗: ' + error.message); return; }
-  $('newAdmEmail').value = '';
-  gmsg(true, '管理者を追加しました');
+  gmsg(true, `${name} を管理者に追加しました`);
   await reloadAll();
 }
 async function delAdmin(user_id) {
@@ -701,32 +704,44 @@ async function delAdmin(user_id) {
   await reloadAll();
 }
 
-// ---------- 申請者 ----------
+// ---------- 申請者（申請権限＝l1_members.can_apply、氏名ベース） ----------
 function renderApplicants() {
-  const list = state.applicants || [];
-  $('aplBody').innerHTML = `<table><thead><tr><th>メール</th><th>登録日</th><th></th></tr></thead><tbody>` +
-    (list.length ? list.map(a => `
+  populateAddApplicantNames();
+  const list = (state.members || []).filter(m => m.can_apply)
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
+  $('aplBody').innerHTML = `<table><thead><tr><th>氏名</th><th>所属Division</th><th></th></tr></thead><tbody>` +
+    (list.length ? list.map(m => `
       <tr>
-        <td>${esc(a.email)}</td>
-        <td class="muted">${esc((a.created_at || '').slice(0, 10))}</td>
-        <td><button class="btn sm red" data-delapl="${esc(a.email)}">削除</button></td>
-      </tr>`).join('') : '<tr><td colspan="3" class="muted">まだ申請者が登録されていません。</td></tr>') + '</tbody></table>';
+        <td>${esc(m.name)}${m.is_active === false ? '<span class="badge" style="margin-left:6px">退会</span>' : ''}</td>
+        <td class="muted">${esc(dName(m.division_id) === '(不明)' ? '' : dName(m.division_id))}</td>
+        <td><button class="btn sm red" data-delapl="${m.id}">権限削除</button></td>
+      </tr>`).join('') : '<tr><td colspan="3" class="muted">申請権限を持つメンバーはいません。</td></tr>') + '</tbody></table>';
   $('aplBody').querySelectorAll('[data-delapl]').forEach(b => b.addEventListener('click', () => delApplicant(b.dataset.delapl)));
 }
+function populateAddApplicantNames() {
+  const names = (state.members || [])
+    .filter(m => m.is_active !== false && m.name && !m.can_apply)
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
+  const sel = $('newAplName'); if (!sel) return;
+  sel.innerHTML = names.length
+    ? '<option value="">選択してください</option>' + names.map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join('')
+    : '<option value="">付与できるメンバーがいません</option>';
+}
 async function addApplicant() {
-  const email = $('newAplEmail').value.trim();
-  if (!email) { gmsg(false, 'メールアドレスを入力してください'); return; }
-  const { error } = await sb.rpc('l1_add_applicant', { p_email: email });
-  if (error) { gmsg(false, '追加に失敗: ' + error.message); return; }
-  $('newAplEmail').value = '';
-  gmsg(true, '申請者を追加しました');
+  const id = $('newAplName').value;
+  if (!id) { gmsg(false, '氏名を選択してください'); return; }
+  const m = (state.members || []).find(x => x.id === id);
+  const { error } = await sb.from('l1_members').update({ can_apply: true }).eq('id', id);
+  if (error) { gmsg(false, '付与に失敗: ' + error.message); return; }
+  gmsg(true, `${m ? m.name : ''} に申請権限を付与しました`);
   await reloadAll();
 }
-async function delApplicant(email) {
-  if (!confirm(`${email} の申請権限を削除しますか？`)) return;
-  const { error } = await sb.from('l1_applicants').delete().eq('email', email);
+async function delApplicant(id) {
+  const m = (state.members || []).find(x => x.id === id);
+  if (!confirm(`${m ? m.name : 'この人'} の申請権限を削除しますか？`)) return;
+  const { error } = await sb.from('l1_members').update({ can_apply: false }).eq('id', id);
   if (error) { gmsg(false, '削除に失敗: ' + error.message); return; }
-  gmsg(true, '申請者を削除しました');
+  gmsg(true, '申請権限を削除しました');
   await reloadAll();
 }
 
@@ -749,7 +764,7 @@ function renderMembers() {
           <button class="btn sm gray" data-savemem="${m.id}">保存</button>
           <button class="btn sm red" data-delmem="${m.id}">削除</button>
         </td>
-      </tr>`).join('') : '<tr><td colspan="5" class="muted">まだメンバーが登録されていません。「Larkから同期」で取り込むか、下のフォームで追加してください。</td></tr>') + '</tbody></table>';
+      </tr>`).join('') : '<tr><td colspan="5" class="muted">まだメンバーが登録されていません。下のフォームで追加してください（毎日自動でLark同期されます）。</td></tr>') + '</tbody></table>';
   $('memBody').querySelectorAll('[data-savemem]').forEach(b => b.addEventListener('click', () => saveMember(b.dataset.savemem)));
   $('memBody').querySelectorAll('[data-delmem]').forEach(b => b.addEventListener('click', () => delMember(b.dataset.delmem)));
 }
@@ -772,14 +787,6 @@ async function saveMember(id) {
   if (error) { gmsg(false, '保存に失敗: ' + error.message); return; }
   gmsg(true, 'メンバーを保存しました');
   await reloadAll();
-}
-async function larkSyncNow() {
-  if (!confirm('Larkから最新のメンバーを取り込みます。よろしいですか？')) return;
-  $('larkSyncBtn').disabled = true;
-  const { error } = await sb.rpc('l1_lark_sync_now');
-  $('larkSyncBtn').disabled = false;
-  if (error) { gmsg(false, '同期の起動に失敗: ' + error.message); return; }
-  gmsg(true, 'Lark同期を開始しました。数十秒後に「メンバー」タブを再読込すると反映されます。');
 }
 async function delMember(id) {
   const m = (state.members || []).find(x => x.id === id);
@@ -811,10 +818,8 @@ $('newDivBtn').addEventListener('click', addDivision);
 $('nrBtn').addEventListener('click', addRule);
 $('nrVariable').addEventListener('change', () => $('nrPointsWrap').classList.toggle('hidden', $('nrVariable').checked));
 $('newAdmBtn').addEventListener('click', addAdmin);
-$('admAutoLinkBtn').addEventListener('click', autoLinkAdmins);
 $('newAplBtn').addEventListener('click', addApplicant);
 $('newMemBtn').addEventListener('click', addMember);
-$('larkSyncBtn').addEventListener('click', larkSyncNow);
 
 populateAdminNames();   // ログイン用の氏名プルダウンを用意
 afterAuth();            // セッションが残っていれば自動ログイン
