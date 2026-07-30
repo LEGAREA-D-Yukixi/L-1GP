@@ -315,6 +315,14 @@ async function reloadAll() {
   state.requests = rq.data; state.events = ev.data; state.admins = ad.data;
   state.applicants = (apl && !apl.error) ? apl.data : [];
   state.members = (mem && !mem.error) ? mem.data : [];
+  // 個人成績の集計に使う獲得者名を基本テーブルから補完（ビューに earner_name が無い場合の保険。読めなければ無視）
+  try {
+    const { data: en } = await sb.from('l1_events').select('id, earner_name').order('occurred_on', { ascending: false }).limit(2000);
+    if (Array.isArray(en) && en.length) {
+      const emap = new Map(en.map(r => [r.id, r.earner_name]));
+      state.events = (state.events || []).map(e => ({ ...e, earner_name: (e.earner_name ?? emap.get(e.id) ?? null) }));
+    }
+  } catch (_) {}
   renderAll();
 }
 function renderAll() {
@@ -598,28 +606,32 @@ async function deleteRule(id) {
 // ---------- 個人成績（登録メンバーをランキング表示・専用権限者のみタブ表示） ----------
 function renderIndividual() {
   const members = (state.members || []).filter(m => m.is_active !== false);
-  // 獲得者名でポイント集計（void除外）
+  const memByName = new Map(members.map(m => [String(m.name || '').trim(), m]));
+
+  // 獲得者名で集計（void除外・直接登録/申請承認の両導線が対象）
   const agg = new Map();
   for (const e of (state.events || [])) {
     if (e.voided_at) continue;
-    const nm = (e.earner_name || '').trim();
+    const nm = String(e.earner_name || '').trim();
     if (!nm) continue;
-    const a = agg.get(nm) || { pts: 0, cnt: 0 };
-    a.pts += (e.points || 0); a.cnt += 1; agg.set(nm, a);
+    const a = agg.get(nm) || { name: nm, pts: 0, cnt: 0 };
+    a.pts += Number(e.points || 0); a.cnt += 1; agg.set(nm, a);
   }
-  // 登録メンバーを基準に一覧（記録が無い人は0）
-  const rows = members.map(m => {
-    const a = agg.get(m.name) || { pts: 0, cnt: 0 };
-    return { name: m.name, division_id: m.division_id, pts: a.pts, cnt: a.cnt };
+
+  // 獲得者を基準にランキング（所属は名簿と一致すれば表示）
+  const rows = [...agg.values()].map(a => {
+    const mm = memByName.get(a.name);
+    return { name: a.name, division_id: mm ? mm.division_id : null, pts: a.pts, cnt: a.cnt };
   }).sort((a, b) => b.pts - a.pts || b.cnt - a.cnt || String(a.name).localeCompare(String(b.name), 'ja'));
+
+  if (rows.length === 0) {
+    $('indBody').innerHTML = '<div class="muted">まだ獲得者のポイント記録がありません。ポイントが承認（または直接登録）されると、獲得者名で自動集計してここにランキング表示します。</div>';
+    return;
+  }
   // 競争順位（同ptは同順位）
   const ranked = [];
   rows.forEach((r, i) => { const rank = (i > 0 && rows[i - 1].pts === r.pts) ? ranked[i - 1].rank : i + 1; ranked.push({ ...r, rank }); });
 
-  if (ranked.length === 0) {
-    $('indBody').innerHTML = '<div class="muted">メンバー名簿に登録がありません。「メンバー」タブで登録してください（毎日自動でLark同期されます）。</div>';
-    return;
-  }
   $('indBody').innerHTML = `<table><thead><tr><th>順位</th><th>獲得者</th><th>所属</th><th style="text-align:right">合計pt</th><th style="text-align:right">件数</th></tr></thead><tbody>` +
     ranked.map(r => `<tr>
       <td style="text-align:center;font-weight:900" class="${r.rank === 1 ? 'rank1' : ''}">${r.rank}</td>
