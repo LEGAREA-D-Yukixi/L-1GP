@@ -20,7 +20,7 @@
   .card h2 { font-size: 15px; margin: 0 0 12px; }
   select, input, textarea { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; width: 100%; }
   label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
-  .btn { background: var(--accent); color: #1a1a1a; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn { background: var(--accent); color: #1a1a1a; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
   .btn.sm { padding: 5px 10px; font-size: 12px; }
   .btn.gray { background: var(--panel2); color: var(--text); border: 1px solid var(--line); }
   .btn.red { background: var(--deduct); color: #fff; }
@@ -133,13 +133,12 @@
     <!-- 申請履歴 -->
     <section id="tabEvents" class="card hidden">
       <h2>申請履歴</h2>
-      <label>シーズン</label><select id="evSeason" style="max-width:280px"></select>
       <div id="evBody" style="margin-top:10px"></div>
     </section>
 
     <!-- 個人成績 -->
     <section id="tabIndividual" class="card hidden">
-      <h2>個人成績ランキング（登録メンバー別）</h2>
+      <h2>個人成績ランキング</h2>
       <div class="muted" style="margin-bottom:8px">メンバー名簿に登録されている人を、獲得ポイントの合計でランキング表示します。</div>
       <div id="indBody" style="margin-top:12px"></div>
     </section>
@@ -441,10 +440,7 @@ function seasonOptions(sel, selectedId) {
     `<option value="${s.id}" ${s.id === selectedId ? 'selected' : ''}>${esc(s.name)}${s.is_active ? '（開催中）' : ''}</option>`).join('');
 }
 function renderEvents() {
-  const active = state.seasons.find(s => s.is_active) ?? state.seasons.at(-1);
-  if ($('evSeason').options.length === 0) seasonOptions($('evSeason'), active?.id);
-  const sid = $('evSeason').value || active?.id;
-  const rows = state.events.filter(e => e.season_id === sid);
+  const rows = state.events;
   if (rows.length === 0) { $('evBody').innerHTML = '<div class="muted">イベントはありません。</div>'; return; }
   $('evBody').innerHTML = `<table><thead><tr><th>発生日時</th><th>Division</th><th>項目</th><th>pt</th><th>理由・詳細</th><th>由来</th><th></th></tr></thead><tbody>` +
     rows.map(e => `
@@ -805,7 +801,6 @@ initEye('npw2Eye','npw2');
 $('logoutBtn').addEventListener('click', logout);
 $('dcRule').addEventListener('change', () => $('dcPointsWrap').classList.toggle('hidden', !rOf($('dcRule').value)?.is_variable));
 $('dcSubmit').addEventListener('click', directSubmit);
-$('evSeason').addEventListener('change', renderEvents);
 $('newDivBtn').addEventListener('click', addDivision);
 $('nrBtn').addEventListener('click', addRule);
 $('nrVariable').addEventListener('change', () => $('nrPointsWrap').classList.toggle('hidden', $('nrVariable').checked));
