@@ -120,10 +120,10 @@
   @keyframes tw{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.25)}}
   @keyframes champGlow{0%,100%{box-shadow:0 0 24px rgba(255,198,39,.4),inset 0 2px 0 rgba(255,225,150,.35),inset 0 -6px 14px rgba(0,0,0,.4)}50%{box-shadow:0 0 44px rgba(255,198,39,.72),inset 0 2px 0 rgba(255,225,150,.5),inset 0 -6px 14px rgba(0,0,0,.4)}}
   @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-  #podium { display:flex; flex-direction:column; align-items:center; gap:12px; }
-  .medallion { width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:20px; color:#2a1c00;
+  #podium { display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .medallion { width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:17px; color:#2a1c00;
     box-shadow:0 3px 8px rgba(0,0,0,.5),inset 0 2px 4px rgba(255,255,255,.6),inset 0 -3px 6px rgba(0,0,0,.35); border:2px solid rgba(255,255,255,.35); flex:0 0 auto; }
-  .medallion.mlarge { width:76px; height:76px; font-size:38px; border-width:3px; }
+  .medallion.mlarge { width:60px; height:60px; font-size:30px; border-width:3px; }
   .medallion { position:relative; overflow:hidden; }
   .medallion::after { content:""; position:absolute; inset:0; border-radius:50%; pointer-events:none;
     background:radial-gradient(120% 82% at 30% 16%, rgba(255,255,255,.6), rgba(255,255,255,0) 55%); }
@@ -140,19 +140,19 @@
   .m-gold{background:var(--g-gold)} .m-silver{background:var(--g-silver)} .m-bronze{background:var(--g-bronze)}
   .m-blue{background:linear-gradient(150deg,#8fd0ff,#2f7fd0,#173a7e);color:#eaf6ff;text-shadow:0 1px 2px rgba(0,0,0,.5)}
   .m-danger{background:linear-gradient(150deg,#ff8a8a,#e0263a,#7e1420);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5)}
-  .prow { position:relative; margin:0 auto; width:100%; display:grid; grid-template-columns:84px 1fr; align-items:center; gap:16px;
-    border-radius:16px; padding:16px 20px; color:var(--text); transition:width .25s ease;
+  .prow { position:relative; margin:0 auto; width:100%; display:grid; grid-template-columns:68px 1fr; align-items:center; gap:12px;
+    border-radius:16px; padding:10px 16px; color:var(--text); transition:width .25s ease;
     background:linear-gradient(180deg,rgba(30,58,124,.96),rgba(10,24,60,.98)); border:1px solid rgba(90,160,255,.35);
     box-shadow:0 10px 24px rgba(0,0,0,.42),inset 0 2px 0 rgba(150,205,255,.35),inset 0 -6px 14px rgba(0,0,0,.4); }
   .prow > .medallion:not(.mlarge) { justify-self:center; }
   .pinfo { min-width:0; }
   .pinfo-top { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-  .prow .nm { font-weight:800; font-size:19px; display:flex; align-items:center; flex-wrap:wrap; min-width:0; overflow-wrap:anywhere; }
+  .prow .nm { font-weight:800; font-size:17px; display:flex; align-items:center; flex-wrap:wrap; min-width:0; overflow-wrap:anywhere; }
   .prow .val { text-align:right; white-space:nowrap; flex:0 0 auto; }
-  .prow .val .pt { font-weight:900; font-size:24px; }
+  .prow .val .pt { font-weight:900; font-size:20px; }
 
   /* ミニ基準線ゲージ: 左端0・中央1,000（数字なし・カード全幅で全行揃う） */
-  .mini { position:relative; height:16px; background:rgba(2,8,24,.85); border-radius:8px; overflow:hidden; border:1px solid var(--line-soft); margin-top:10px; width:100%; }
+  .mini { position:relative; height:12px; background:rgba(2,8,24,.85); border-radius:8px; overflow:hidden; border:1px solid var(--line-soft); margin-top:6px; width:100%; }
   .mini .f { position:absolute; left:0; top:0; bottom:0; border-radius:8px 0 0 8px; }
   .mini .f.up { background:linear-gradient(90deg,rgba(56,224,138,.5),var(--add)); }
   .mini .f.down { background:linear-gradient(90deg,rgba(255,85,110,.5),var(--deduct)); }
@@ -161,9 +161,9 @@
 
   /* 1位 = 王者（金オーラ＋トロフィー） */
   .prow.champ { background:linear-gradient(180deg,rgba(92,66,14,.7),rgba(30,24,8,.92)); border:2px solid var(--gold); animation:champGlow 2.8s ease-in-out infinite; }
-  .prow.champ .nm { font-size:23px; color:var(--gold-soft); text-shadow:0 0 14px rgba(255,198,39,.5); }
-  .prow.champ .val .pt { font-size:28px; color:var(--gold-soft); }
-  .prow .c-tro { position:absolute; right:16px; top:-22px; height:62px; filter:drop-shadow(0 6px 14px rgba(255,198,39,.6)); animation:floaty 4s ease-in-out infinite; }
+  .prow.champ .nm { font-size:19px; color:var(--gold-soft); text-shadow:0 0 14px rgba(255,198,39,.5); }
+  .prow.champ .val .pt { font-size:23px; color:var(--gold-soft); }
+  .prow .c-tro { position:absolute; right:16px; top:-16px; height:48px; filter:drop-shadow(0 6px 14px rgba(255,198,39,.6)); animation:floaty 4s ease-in-out infinite; }
   .champ-tag { display:inline-block; font-size:12px; font-weight:900; color:#2a1c00; background:var(--g-gold); padding:2px 10px; border-radius:11px; margin-left:8px; }
 
   /* 最下位 = 危険（ハザードテープ） */
@@ -365,6 +365,7 @@ import {
   isBlackout, isAnnualBlackout, seasonForDate, calcStandingsCarry, calcAnnualStandings,
   validateRequestInput, groupRules, buildFeed, formatPoints, seasonBaseline, pointsBar, pyramidWidth, annualTermLabel, rankGaps, leadOverSecond,
   fiscalTerm, isSecondHalf, seasonCountdown,
+  filterNameItems,
 } from './l1-core.js';
 import { ICON_DATA, TROPHY, DEFAULT_ICON } from './l1-icons.js';
 
@@ -382,6 +383,37 @@ function iconImg(cat, cls) {
 
 let state = { divisions: [], seasons: [], rules: [], events: [], selectedSeasonId: null, feedSeasonId: null, feedPage: 0 };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+// 氏名セレクトにリアルタイム検索を付ける（1文字入力ごとに候補を更新）
+function attachSearchSelect(sel, getItems, opts = {}) {
+  if (!sel) return null;
+  const prev = sel.previousElementSibling;
+  let box;
+  if (prev && prev.dataset && prev.dataset.nsearch === '1') {
+    box = prev;
+  } else {
+    box = document.createElement('input');
+    box.type = 'search';
+    box.dataset.nsearch = '1';
+    box.autocomplete = 'off';
+    box.placeholder = opts.placeholder || '氏名で検索';
+    box.style.marginBottom = '6px';
+    sel.parentNode.insertBefore(box, sel);
+  }
+  const emptyLabel = opts.emptyLabel ?? '選択してください';
+  const render = () => {
+    const hits = filterNameItems(getItems(), box.value);
+    const want = sel.value || '';
+    const head = hits.length
+      ? `<option value="">${esc(emptyLabel)}</option>`
+      : `<option value="">${esc(box.value ? '該当する氏名がありません' : emptyLabel)}</option>`;
+    sel.innerHTML = head + hits.map(it => `<option value="${esc(it.value)}">${esc(it.label)}</option>`).join('');
+    if (want && hits.some(it => String(it.value) === String(want))) sel.value = want;
+  };
+  box.oninput = render;   // 1文字ごとにリアルタイム更新
+  render();
+  return render;
+}
 function showErr(msg) { const b=$('errBox'); b.className='msg ngmsg'; b.textContent=msg; }
 
 async function loadAll() {
@@ -473,8 +505,26 @@ function renderStandings() {
       </div>`;
   } else {
     renderPyramid($('standingsBody'), rows, baseline);
+    requestAnimationFrame(() => fitPodium($('standingsBody')));
   }
   renderFeed('feed');
+}
+
+// 順位が多いときは、画面の高さに収まるよう順位全体を自動縮小（画面内に最下位まで表示）
+function fitPodium(container) {
+  const p = container && container.querySelector('#podium');
+  if (!p) return;
+  p.style.transform = '';
+  p.style.marginBottom = '';
+  const natural = p.offsetHeight;
+  if (!natural) return;                                   // 非表示/空
+  const topVp = p.getBoundingClientRect().top;
+  const avail = window.innerHeight - topVp - 10;
+  if (avail <= 0 || natural <= avail) return;             // すでに収まっている
+  const scale = Math.max(0.45, avail / natural);
+  p.style.transformOrigin = 'top center';
+  p.style.transform = `scale(${scale})`;
+  p.style.marginBottom = `-${Math.round(natural * (1 - scale))}px`;   // 縮小分だけ下の余白を詰める
 }
 
 // ポイント増減履歴（全期間を新しい順にページング）。順位/年間で共通表示・独立ページング
@@ -673,14 +723,15 @@ function initEye(btnId, inputId) {
 }
 // ---------- ログイン（氏名＋パスワード / 内部は Supabase Auth） ----------
 let loginSession = null;   // { name }
+let loginNames = [];       // ログイン氏名の候補（検索用に保持）
 // ログイン氏名プルダウン（在籍メンバー全員）
 async function populateLoginNames() {
   try {
     const { data } = await sb.from('l1_member_names').select('name,is_active').order('name');
-    const names = [...new Set((data || []).filter(r => r.is_active !== false).map(r => r.name).filter(Boolean))]
+    loginNames = [...new Set((data || []).filter(r => r.is_active !== false).map(r => r.name).filter(Boolean))]
       .sort((a, b) => String(a).localeCompare(String(b), 'ja'));
-    const sel = $('dashLgName');
-    if (sel) sel.innerHTML = '<option value="">氏名を選択</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    // 在籍メンバー全員が対象でDivisionで絞り込めないため、リアルタイム検索を付与
+    attachSearchSelect($('dashLgName'), () => loginNames, { emptyLabel: '氏名を選択' });
   } catch { /* 取得失敗時は空のまま */ }
 }
 // 申請できる氏名か（申請権限者 または 管理者）
@@ -773,7 +824,9 @@ function switchTab(tab) {
   if (tab === 'tabAnnual') renderAnnual();
   if (tab === 'tabCriteria') renderCriteria();
   if (tab === 'tabApply') { applyView('form'); loadMembersIntoForm(); }
+  if (tab === 'tabSeason') requestAnimationFrame(() => fitPodium($('standingsBody')));
 }
+window.addEventListener('resize', () => { const s = $('secSeason'); if (s && !s.classList.contains('hidden')) fitPodium($('standingsBody')); });
 
 // 都市スカイライン生成（ネオン・シンセウェーブ調をSVGで。参考画像の雰囲気＝暗いビル+ネオン輪郭+発光窓+ライトビーム+水面反射）
 // （背景は指定画像をCSSで表示。SVG生成は廃止）

@@ -220,6 +220,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import {
   calcStandings, calcStandingsCarry, calcAnnualStandings, validateRequestInput, groupRules,
   formatPoints, seasonForDate, seasonActivationPlan, approvalAction,
+  filterNameItems, namesForDivision,
 } from './l1-core.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -227,7 +228,40 @@ const $ = id => document.getElementById(id);
 const todayISO = () => new Date().toLocaleDateString('sv-SE');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// 氏名セレクトにリアルタイム検索を付ける（1文字入力ごとに候補を更新）
+// getItems() は [{value,label}] または 文字列配列 を返す関数
+function attachSearchSelect(sel, getItems, opts = {}) {
+  if (!sel) return null;
+  const prev = sel.previousElementSibling;
+  let box;
+  if (prev && prev.dataset && prev.dataset.nsearch === '1') {
+    box = prev;
+  } else {
+    box = document.createElement('input');
+    box.type = 'search';
+    box.dataset.nsearch = '1';
+    box.autocomplete = 'off';
+    box.placeholder = opts.placeholder || '氏名で検索（1文字から絞り込み）';
+    box.style.marginBottom = '6px';
+    sel.parentNode.insertBefore(box, sel);
+  }
+  const emptyLabel = opts.emptyLabel ?? '選択してください';
+  const render = () => {
+    const hits = filterNameItems(getItems(), box.value);
+    const want = sel.value || sel.dataset.selValue || '';
+    const head = hits.length
+      ? `<option value="">${esc(emptyLabel)}</option>`
+      : `<option value="">${esc(box.value ? '該当する氏名がありません' : (opts.noneLabel || '候補がありません'))}</option>`;
+    sel.innerHTML = head + hits.map(it => `<option value="${esc(it.value)}">${esc(it.label)}</option>`).join('');
+    if (want && hits.some(it => String(it.value) === String(want))) sel.value = want;
+  };
+  box.oninput = render;   // 1文字ごとにリアルタイム更新
+  render();
+  return render;
+}
+
 let state = { divisions: [], seasons: [], rules: [], requests: [], events: [], admins: [], user: null };
+let adminLoginNames = [];   // 管理者ログインの氏名候補（検索用に保持）
 
 function flash(el, okFlag, text) {
   el.className = 'msg ' + (okFlag ? 'okmsg' : 'ngmsg');
@@ -240,9 +274,10 @@ const gmsg = (okFlag, text) => flash($('gMsg'), okFlag, text);
 async function populateAdminNames() {
   try {
     const { data } = await sb.rpc('l1_admin_names');
-    const names = Array.isArray(data) ? data : [];
-    const sel = $('lgName');
-    if (sel) sel.innerHTML = '<option value="">氏名を選択</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    adminLoginNames = Array.isArray(data) ? data : [];
+    // Divisionで絞り込めない箇所のためリアルタイム検索を付与
+    attachSearchSelect($('lgName'), () => adminLoginNames,
+      { emptyLabel: '氏名を選択', noneLabel: '氏名を選択', placeholder: '氏名で検索' });
   } catch { /* 取得失敗時は空 */ }
 }
 async function login() {
@@ -472,19 +507,26 @@ function renderDirectForm() {
     `<optgroup label="減点">${g.deduct.map(opt).join('')}</optgroup>`;
   if (!$('dcDate').value) $('dcDate').value = todayISO();
 
-  // 獲得者名: 名簿（Lark同期）があればプルダウン、無ければテキスト入力（集計のばらつき防止）
+  populateDirectEarner();
+}
+
+// 獲得者プルダウン: 選択中のDivisionに所属するメンバーのみ表示
+// （Division未選択なら在籍メンバー全員。名簿が取れない場合はテキスト入力にフォールバック）
+function populateDirectEarner() {
   const sel = $('dcEarnerSel'), txt = $('dcEarner');
-  const names = [...new Set((state.members || [])
-    .filter(m => m.is_active !== false).map(m => m.name).filter(Boolean))];
-  if (names.length) {
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">選択してください</option>' +
-      names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
-    if (names.includes(cur)) sel.value = cur;
-    sel.classList.remove('hidden'); txt.classList.add('hidden');
-  } else {
-    sel.classList.add('hidden'); txt.classList.remove('hidden');
+  if (!sel || !txt) return;
+  if (!(state.members || []).some(m => m.is_active !== false && m.name)) {
+    sel.classList.add('hidden'); txt.classList.remove('hidden'); return;
   }
+  const divId = $('dcDivision') ? $('dcDivision').value : '';
+  const items = namesForDivision(state.members, divId);
+  const cur = sel.value;
+  const head = items.length
+    ? '<option value="">選択してください</option>'
+    : `<option value="">${divId ? 'このDivisionに在籍メンバーがいません' : '候補がありません'}</option>`;
+  sel.innerHTML = head + items.map(it => `<option value="${esc(it.value)}">${esc(it.label)}</option>`).join('');
+  if (cur && items.some(it => it.value === cur)) sel.value = cur;
+  sel.classList.remove('hidden'); txt.classList.add('hidden');
 }
 async function directSubmit() {
   const rule = rOf($('dcRule').value) || null;
@@ -723,7 +765,7 @@ function renderAdmins() {
     state.admins.map(a => `
       <tr>
         <td>
-          <select id="al-${a.user_id}" style="min-width:150px">${memberNameOptions(a.lark_name)}</select>
+          <select id="al-${a.user_id}" data-sel-value="${esc(a.lark_name ?? '')}" style="min-width:150px">${memberNameOptions(a.lark_name)}</select>
           ${a.open_id ? '<span class="badge on" style="margin-left:6px">紐付け済</span>' : '<span class="badge" style="margin-left:6px">未紐付け</span>'}
         </td>
         <td><select id="adv-${a.user_id}" style="min-width:120px">${divOptions(a.division_id)}</select></td>
@@ -733,6 +775,12 @@ function renderAdmins() {
           ${a.user_id === state.user?.id ? '<span class="muted">自分</span>' : `<button class="btn sm red" data-deladm="${a.user_id}">削除</button>`}
         </td>
       </tr>`).join('') + '</tbody></table>';
+  // Divisionで絞り込めない箇所のため、行ごとにリアルタイム検索を付与
+  const larkNames = namesForDivision(state.members, '', { requireOpenId: true });
+  (state.admins || []).forEach(a => {
+    attachSearchSelect($(`al-${a.user_id}`), () => larkNames,
+      { emptyLabel: '（未設定）', noneLabel: '（未設定）', placeholder: '氏名で検索' });
+  });
   $('admBody').querySelectorAll('[data-deladm]').forEach(b => b.addEventListener('click', () => delAdmin(b.dataset.deladm)));
   $('admBody').querySelectorAll('[data-savelark]').forEach(b => b.addEventListener('click', () => saveAdminLark(b.dataset.savelark)));
 }
@@ -754,9 +802,8 @@ function populateAddAdminNames() {
     .filter(m => m.is_active !== false && m.name && !adminNames.has(nrm(m.name)))
     .map(m => m.name))].sort((a, b) => String(a).localeCompare(String(b), 'ja'));
   const sel = $('newAdmName'); if (!sel) return;
-  sel.innerHTML = names.length
-    ? '<option value="">選択してください</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')
-    : '<option value="">追加できるメンバーがいません</option>';
+  // Divisionで絞り込めない箇所のためリアルタイム検索を付与
+  attachSearchSelect(sel, () => names, { noneLabel: '追加できるメンバーがいません' });
 }
 async function addAdmin() {
   const name = $('newAdmName').value;
@@ -793,9 +840,9 @@ function populateAddApplicantNames() {
     .filter(m => m.is_active !== false && m.name && !m.can_apply)
     .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
   const sel = $('newAplName'); if (!sel) return;
-  sel.innerHTML = names.length
-    ? '<option value="">選択してください</option>' + names.map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join('')
-    : '<option value="">付与できるメンバーがいません</option>';
+  // Divisionで絞り込めない箇所のためリアルタイム検索を付与
+  attachSearchSelect(sel, () => names.map(m => ({ value: m.id, label: m.name })),
+    { noneLabel: '付与できるメンバーがいません' });
 }
 async function addApplicant() {
   const id = $('newAplName').value;
@@ -913,6 +960,7 @@ $('npwBtn').addEventListener('click', submitNewPassword);
 initEye('npw1Eye','npw1');
 initEye('npw2Eye','npw2');
 $('logoutBtn').addEventListener('click', logout);
+$('dcDivision').addEventListener('change', populateDirectEarner);   // 選択Divisionで獲得者を絞り込む
 $('dcRule').addEventListener('change', () => $('dcPointsWrap').classList.toggle('hidden', !rOf($('dcRule').value)?.is_variable));
 $('dcSubmit').addEventListener('click', directSubmit);
 $('newDivBtn').addEventListener('click', addDivision);

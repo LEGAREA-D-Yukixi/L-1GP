@@ -335,6 +335,49 @@ export function approvalAction({ status, isSpecial = false, iApproved = false, a
   return { ...base, mode: 'approve', label: `承認（1次 ${prog}）` };
 }
 
+/** 検索キーの正規化: 空白（半角/全角）を除去して小文字化 */
+export function normalizeSearchKey(s) {
+  return String(s ?? '').replace(/[\s　]+/g, '').toLowerCase();
+}
+
+/**
+ * 氏名候補を検索文字列で絞り込む（1文字目から部分一致・空白差を無視）。
+ * items は [{value, label}] または文字列配列を受け付ける。
+ * query が空なら全件を返す。
+ */
+export function filterNameItems(items, query) {
+  const list = (items || [])
+    .map(it => (typeof it === 'string')
+      ? { value: it, label: it }
+      : { value: it?.value ?? '', label: String(it?.label ?? '') })
+    .filter(it => it.label);
+  const q = normalizeSearchKey(query);
+  if (!q) return list;
+  return list.filter(it => normalizeSearchKey(it.label).includes(q));
+}
+
+/**
+ * 選択Divisionに所属する在籍メンバーの氏名候補を返す。
+ * divisionId が空（未選択）なら絞り込まず全員を返す。
+ * requireOpenId=true でLark紐付け済みのみに限定（管理者のLark通知先など）。
+ * 戻り値: [{value, label}]（氏名の昇順・重複除去）
+ */
+export function namesForDivision(members, divisionId, { requireOpenId = false, valueKey = 'name' } = {}) {
+  const seen = new Set();
+  const out = [];
+  for (const m of members || []) {
+    if (!m || !m.name) continue;
+    if (m.is_active === false) continue;
+    if (requireOpenId && !m.open_id) continue;
+    if (divisionId && m.division_id !== divisionId) continue;
+    const key = normalizeSearchKey(m.name);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ value: valueKey === 'id' ? m.id : m.name, label: m.name });
+  }
+  return out.sort((a, b) => String(a.label).localeCompare(String(b.label), 'ja'));
+}
+
 /** シーズン切替（管理画面用）: 現activeをfalse→対象をtrueの2段更新の順序を返す */
 export function seasonActivationPlan(seasons, targetSeasonId) {
   const current = (seasons || []).filter(s => s.is_active && s.id !== targetSeasonId);
