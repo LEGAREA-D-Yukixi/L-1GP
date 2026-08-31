@@ -296,7 +296,7 @@
     <div class="banner"><span class="tri">▶▶▶</span><span id="standingsTitle">現在の順位</span><span class="tri">◀◀◀</span></div>
     <div id="seasonCountdown" class="season-countdown hidden"></div>
     <div id="standingsBody"></div>
-    <div class="banner"><span class="tri">▶▶</span>ポイント増減履歴<span class="tri">◀◀</span></div>
+    <div class="banner"><span class="tri">▶▶</span>今期のポイント増減履歴<span class="tri">◀◀</span></div>
     <div class="card">
       <div id="feedBody"></div>
       <div id="feedPager" class="pager"></div>
@@ -307,7 +307,7 @@
   <section id="secAnnual" class="hidden">
     <div class="banner"><span class="tri">▶▶▶</span><span id="annualTitle">年間集計</span><span class="tri">◀◀◀</span></div>
     <div id="annualBody"></div>
-    <div class="banner"><span class="tri">▶▶</span>ポイント増減履歴<span class="tri">◀◀</span></div>
+    <div class="banner"><span class="tri">▶▶</span>今期のポイント増減履歴<span class="tri">◀◀</span></div>
     <div class="card">
       <div id="annualFeedBody"></div>
       <div id="annualFeedPager" class="pager"></div>
@@ -365,7 +365,7 @@ import {
   isBlackout, isAnnualBlackout, seasonForDate, calcStandingsCarry, calcAnnualStandings,
   validateRequestInput, groupRules, buildFeed, formatPoints, seasonBaseline, pointsBar, pyramidWidth, annualTermLabel, rankGaps, leadOverSecond,
   fiscalTerm, isSecondHalf, seasonCountdown,
-  filterNameItems,
+  filterNameItems, eventsForSeasons, seasonIdsForCycle,
 } from './l1-core.js';
 import { ICON_DATA, TROPHY, DEFAULT_ICON } from './l1-icons.js';
 
@@ -501,13 +501,14 @@ function renderStandings() {
       <div class="card blackout">
         <div class="big">🤫 順位は決起会で発表！</div>
         <p>結果発表月のため、順位と現在ポイントは非公開です。</p>
-        <p>ポイントの増減は下の履歴で確認できます。</p>
+        <p>今期のポイント増減は下の履歴で確認できます。</p>
       </div>`;
   } else {
     renderPyramid($('standingsBody'), rows, baseline);
     requestAnimationFrame(() => fitPodium($('standingsBody')));
   }
-  renderFeed('feed');
+  // 履歴は表示中シーズンが属する期(cycle)のみ（前期の記録は表示しない）
+  renderFeed('feed', eventsForSeasons(state.events, seasonIdsForCycle(state.seasons, season.cycle)));
 }
 
 // 順位が多いときは、画面の高さに収まるよう順位全体を自動縮小（画面内に最下位まで表示）
@@ -542,16 +543,20 @@ function feedPageList(cur, pages) {
   }
   return out;
 }
-function renderFeed(key = 'feed') {
+// 表示中のシーズン範囲のイベントをキー別に保持（ページャの再帰呼び出しでも範囲を維持する）
+const feedEventsState = {};
+function renderFeed(key = 'feed', events) {
   const bodyEl = $(key + 'Body'), pagerEl = $(key + 'Pager');
   if (!bodyEl) return;
-  const feed = buildFeed({ events:state.events, divisions:state.divisions, rules:state.rules, limit:100000 });
+  if (events !== undefined) feedEventsState[key] = events;
+  const src = feedEventsState[key] || [];
+  const feed = buildFeed({ events:src, divisions:state.divisions, rules:state.rules, limit:100000 });
   const pages = Math.max(1, Math.ceil(feed.length / FEED_PAGE_SIZE));
   feedPageState[key] = Math.min(Math.max(0, feedPageState[key] || 0), pages - 1);
   const page = feedPageState[key];
   const slice = feed.slice(page * FEED_PAGE_SIZE, (page + 1) * FEED_PAGE_SIZE);
   bodyEl.innerHTML = feed.length === 0
-    ? '<div class="muted" style="padding:12px 0">まだ記録がありません。</div>'
+    ? '<div class="muted" style="padding:12px 0">今期のポイント記録はまだありません。</div>'
     : slice.map(f => `
       <div class="feeditem">
         <div class="left">${iconImg(f.category,'fi') || `<img class="fi" src="${DEFAULT_ICON}" alt="">`}<span class="ftext"><span class="date">${esc(f.occurred_on)}</span><b>${esc(f.division_name)}</b>　${esc(f.category)}<span class="muted">（${esc(f.label)}）</span></span></div>
@@ -588,16 +593,17 @@ function renderAnnual() {
       <div class="card blackout">
         <div class="big">🤫 年間王者は決起会で発表！</div>
         <p>結果発表月のため、年間集計は非公開です。</p>
-        <p>ポイントの増減は下の履歴で確認できます。</p>
+        <p>今期のポイント増減は下の履歴で確認できます。</p>
       </div>`;
-    renderFeed('annualFeed');
+    renderFeed('annualFeed', eventsForSeasons(state.events, seasonIdsForCycle(state.seasons, cycle)));
     return;
   }
   const eventsBySeason = new Map(state.seasons.map(s => [s.id, state.events.filter(e => e.season_id === s.id)]));
   const rows = calcAnnualStandings({ cycle, seasons:state.seasons, divisions:state.divisions.filter(d=>d.is_active!==false&&d.in_ranking!==false), eventsBySeason });
   const baseline = seasonBaseline({ season, seasons:state.seasons });
   renderPyramid($('annualBody'), rows, baseline);
-  renderFeed('annualFeed');
+  // 履歴は同一期（cycle）のみ（前期の記録は表示しない）
+  renderFeed('annualFeed', eventsForSeasons(state.events, seasonIdsForCycle(state.seasons, cycle)));
 }
 
 function renderCriteria() {
