@@ -213,7 +213,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import {
   calcStandings, calcStandingsCarry, calcAnnualStandings, validateRequestInput, groupRules,
-  formatPoints, seasonForDate, seasonActivationPlan,
+  formatPoints, seasonForDate, seasonActivationPlan, approvalAction,
 } from './l1-core.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -315,14 +315,29 @@ async function reloadAll() {
   state.requests = rq.data; state.events = ev.data; state.admins = ad.data;
   state.applicants = (apl && !apl.error) ? apl.data : [];
   state.members = (mem && !mem.error) ? mem.data : [];
-  // 個人成績の集計に使う獲得者名を基本テーブルから補完（ビューに earner_name が無い場合の保険。読めなければ無視）
+  // 個人成績はサーバー側で集計する（l1_27のRPC）。
+  // l1_events_full に earner_name 列が無く、l1_events の直読みはRLSで拒否されるため、
+  // クライアント集計はできない。失敗は沈黙させず画面に理由を出す。
+  state.individual = null;
+  state.individualError = null;
+  if (state.canIndividual) {
+    const { data: ind, error: indErr } = await sb.rpc('l1_individual_standings');
+    if (indErr) state.individualError = indErr.message || String(indErr);
+    else state.individual = Array.isArray(ind) ? ind : [];
+  }
+  // 承認進捗（全通常管理者の承認が必須。l1_25で追加したRPC）
+  state.progress = new Map();
+  state.requiredApprovals = 0;
   try {
-    const { data: en } = await sb.from('l1_events').select('id, earner_name').order('occurred_on', { ascending: false }).limit(2000);
-    if (Array.isArray(en) && en.length) {
-      const emap = new Map(en.map(r => [r.id, r.earner_name]));
-      state.events = (state.events || []).map(e => ({ ...e, earner_name: (e.earner_name ?? emap.get(e.id) ?? null) }));
+    const { data: pg } = await sb.rpc('l1_request_progress');
+    if (Array.isArray(pg) && pg.length) {
+      for (const row of pg) state.progress.set(row.request_id, row);
+      state.requiredApprovals = Number(pg[0].required) || 0;
+    } else {
+      const { data: rc } = await sb.rpc('l1_regular_admin_count');
+      state.requiredApprovals = Number(rc) || 0;
     }
-  } catch (_) {}
+  } catch (_) { /* l1_25未適用でも画面は動かす */ }
   renderAll();
 }
 function renderAll() {
@@ -338,30 +353,45 @@ function renderRequests() {
   $('pendingCount').textContent = state.requests.length;
   if (state.requests.length === 0) { $('reqBody').innerHTML = '<div class="muted">承認待ちの申請はありません。</div>'; return; }
   const sp = !!state.canIndividual; // 特別管理者か
-  $('reqBody').innerHTML = `<table><thead><tr><th>状態</th><th>申請日</th><th>発生日</th><th>Division</th><th>項目</th><th>pt</th><th>獲得者</th><th>申請者</th><th>詳細</th><th></th></tr></thead><tbody>` +
+  const prog = state.progress instanceof Map ? state.progress : new Map();
+  const req0 = Number(state.requiredApprovals) || 0;
+  $('reqBody').innerHTML = `<table><thead><tr><th>状態</th><th>承認</th><th>申請日</th><th>発生日</th><th>Division</th><th>項目</th><th>pt</th><th>獲得者</th><th>申請者</th><th>詳細</th><th></th></tr></thead><tbody>` +
     state.requests.map(q => {
       const r = rOf(q.rule_id);
       const variable = !!r?.is_variable;
       const isFinal = q.status === 'pending_final';
+      const pr = prog.get(q.id) || {};
+      const approved = Number(pr.approved) || 0;
+      const required = Number(pr.required ?? req0) || 0;
+      const act = approvalAction({
+        status: q.status, isSpecial: sp, iApproved: !!pr.i_approved,
+        approved, required, isVariable: variable,
+      });
       const statusBadge = isFinal ? '<span class="badge on">特別承認待ち</span>' : '<span class="badge">承認待ち</span>';
-      // ボタン: pending=誰でも承認（通常→特別承認へ / 特別→確定）, pending_final=特別管理者のみ確定
+      // 承認進捗（1次承認の達成状況）
+      const names = Array.isArray(pr.approver_names) ? pr.approver_names : [];
+      const progCell = isFinal
+        ? `<span class="badge on">1次完了</span>`
+        : `<span class="badge${approved >= required && required > 0 ? ' on' : ''}" title="${esc(names.join('・') || '承認者なし')}">${approved}/${required}</span>`;
       let actions = '';
-      if (!isFinal) {
-        actions = `<button class="btn sm" data-approve="${q.id}">${sp ? '承認（確定）' : '承認（特別承認へ）'}</button>`;
-      } else if (sp) {
-        actions = `<button class="btn sm" data-approve="${q.id}">特別承認（確定）</button>`;
-      } else {
-        actions = `<span class="muted" style="font-size:12px">特別管理者の承認待ち</span>`;
+      if (act.mode === 'approve' || act.mode === 'final') {
+        actions = `<button class="btn sm" data-approve="${q.id}">${esc(act.label)}</button>`;
+      } else if (act.mode === 'approved') {
+        actions = `<button class="btn sm gray" disabled>${esc(act.label)}</button>`;
       }
-      actions += `<button class="btn sm red" data-reject="${q.id}">却下</button>`;
+      if (act.note) actions += `<span class="muted" style="font-size:12px">${esc(act.note)}</span>`;
+      if (act.canReject) actions += `<button class="btn sm red" data-reject="${q.id}">却下</button>`;
       return `<tr>
         <td style="white-space:nowrap">${statusBadge}</td>
+        <td style="text-align:center;white-space:nowrap">${progCell}</td>
         <td class="muted" style="white-space:nowrap">${q.created_at ? esc(new Date(q.created_at).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })) : ''}</td>
         <td>${esc(q.occurred_on)}</td>
         <td>${esc(dName(q.division_id))}</td>
         <td>${esc(r ? r.category + '｜' + r.label : '(不明)')}</td>
         <td>${variable
-          ? `<input type="number" step="1" value="${q.points ?? ''}" id="qp-${q.id}" style="width:90px">`
+          ? (act.showPointsInput
+              ? `<input type="number" step="1" value="${q.points ?? ''}" id="qp-${q.id}" style="width:90px">`
+              : `<span class="muted">特別承認時に確定</span>`)
           : `<span class="${(q.points ?? 0) >= 0 ? 'add' : 'deduct'}">${esc(formatPoints(q.points))}</span>`}</td>
         <td>${esc(q.earner_name ?? '')}</td>
         <td>${esc(q.requester_name)}</td>
@@ -369,7 +399,7 @@ function renderRequests() {
         <td style="white-space:nowrap">${actions}</td>
       </tr>`;
     }).join('') + '</tbody></table>'
-    + '<div class="muted" style="margin-top:6px">通常管理者の承認で「特別承認待ち」になり、特別管理者へ通知されます。特別管理者が承認するとダッシュボードへ反映されます。</div>';
+    + `<div class="muted" style="margin-top:6px">通常管理者<b>全員（${req0}名）</b>の承認が揃うと「特別承認待ち」になり、特別管理者へ通知されます。特別管理者が承認するとダッシュボードへ反映されます。可変ポイントの金額は特別承認時に確定します。却下は管理者1名で成立します。</div>`;
 
   $('reqBody').querySelectorAll('[data-approve]').forEach(b => b.addEventListener('click', () => review(b.dataset.approve, 'approve')));
   $('reqBody').querySelectorAll('[data-reject]').forEach(b => b.addEventListener('click', () => review(b.dataset.reject, 'reject')));
@@ -378,7 +408,8 @@ async function review(id, action) {
   const q = state.requests.find(x => x.id === id);
   const r = rOf(q?.rule_id);
   let p_points = null;
-  if (action === 'approve' && r?.is_variable) {
+  // 可変ポイントは特別承認（pending_final）の確定時のみ入力・必須
+  if (action === 'approve' && r?.is_variable && q?.status === 'pending_final') {
     const raw = $(`qp-${id}`)?.value;
     const v = parseInt(String(raw ?? '').trim(), 10);
     if (!Number.isInteger(v) || v === 0) { gmsg(false, '可変ポイントを入力してください（0以外の整数）'); return; }
@@ -387,11 +418,26 @@ async function review(id, action) {
   const p_comment = action === 'reject' ? (prompt('却下理由（任意）') ?? null) : null;
   const { error } = await sb.rpc('l1_review_request', { p_request_id: id, p_action: action, p_points, p_comment });
   if (error) { gmsg(false, '処理に失敗: ' + error.message); return; }
-  const msg = action === 'reject' ? '却下しました'
-    : (q?.status === 'pending_final' || state.canIndividual) ? '承認しました（ダッシュボードへ反映されます）'
-    : '1次承認しました（特別管理者へ通知しました）';
-  gmsg(true, msg);
+  const prevStatus = q?.status;
   await reloadAll();
+  let msg;
+  if (action === 'reject') {
+    msg = '却下しました';
+  } else if (prevStatus === 'pending_final') {
+    msg = '承認しました（ダッシュボードへ反映されます）';
+  } else {
+    const after = state.requests.find(x => x.id === id);
+    if (!after) {
+      msg = '承認しました（ダッシュボードへ反映されます）';
+    } else if (after.status === 'pending_final') {
+      msg = '通常管理者全員の承認が揃いました（特別管理者へ通知しました）';
+    } else {
+      const pr = (state.progress instanceof Map ? state.progress.get(id) : null) || {};
+      const remain = Math.max(0, (Number(pr.required) || 0) - (Number(pr.approved) || 0));
+      msg = `1次承認しました（残り ${remain} 名の承認待ち）`;
+    }
+  }
+  gmsg(true, msg);
 }
 
 // ---------- 直接登録 ----------
@@ -605,27 +651,30 @@ async function deleteRule(id) {
 
 // ---------- 個人成績（登録メンバーをランキング表示・専用権限者のみタブ表示） ----------
 function renderIndividual() {
-  const members = (state.members || []).filter(m => m.is_active !== false);
-  const memByName = new Map(members.map(m => [String(m.name || '').trim(), m]));
-
-  // 獲得者名で集計（void除外・直接登録/申請承認の両導線が対象）
-  const agg = new Map();
-  for (const e of (state.events || [])) {
-    if (e.voided_at) continue;
-    const nm = String(e.earner_name || '').trim();
-    if (!nm) continue;
-    const a = agg.get(nm) || { name: nm, pts: 0, cnt: 0 };
-    a.pts += Number(e.points || 0); a.cnt += 1; agg.set(nm, a);
+  // 読み込み失敗は沈黙させない（原因の切り分けができるよう理由を出す）
+  if (state.individualError) {
+    $('indBody').innerHTML = `<div style="color:#c0392b;font-weight:700">個人成績を読み込めませんでした</div>`
+      + `<div class="muted" style="margin-top:4px">${esc(state.individualError)}</div>`
+      + (/does not exist|schema cache|could not find/i.test(state.individualError)
+          ? `<div class="muted" style="margin-top:4px">l1_27（l1_individual_standings）が未適用の可能性があります。</div>` : '');
+    return;
+  }
+  if (state.individual === null) {
+    $('indBody').innerHTML = '<div class="muted">読み込み中…</div>';
+    return;
   }
 
-  // 獲得者を基準にランキング（所属は名簿と一致すれば表示）
-  const rows = [...agg.values()].map(a => {
-    const mm = memByName.get(a.name);
-    return { name: a.name, division_id: mm ? mm.division_id : null, pts: a.pts, cnt: a.cnt };
-  }).sort((a, b) => b.pts - a.pts || b.cnt - a.cnt || String(a.name).localeCompare(String(b.name), 'ja'));
+  // サーバー側（l1_individual_standings）で集計済み。void除外・全シーズン対象。
+  const rows = (state.individual || []).map(r => ({
+    name: String(r.earner_name || '').trim(),
+    division_id: r.division_id || null,
+    pts: Number(r.total_points || 0),
+    cnt: Number(r.event_count || 0),
+  })).filter(r => r.name);
 
   if (rows.length === 0) {
-    $('indBody').innerHTML = '<div class="muted">まだ獲得者のポイント記録がありません。ポイントが承認（または直接登録）されると、獲得者名で自動集計してここにランキング表示します。</div>';
+    $('indBody').innerHTML = '<div class="muted">獲得者名が入ったポイント記録がまだありません。'
+      + '承認したポイントが反映されない場合は、l1_review_request が申請の獲得者名を l1_events にコピーしていない可能性があります。</div>';
     return;
   }
   // 競争順位（同ptは同順位）
@@ -762,21 +811,46 @@ function renderMembers() {
         <td><label style="font-weight:600"><input type="checkbox" id="ma-${m.id}" ${m.is_active ? 'checked' : ''} style="width:auto"> 有効</label></td>
         <td style="white-space:nowrap">
           <button class="btn sm gray" data-savemem="${m.id}">保存</button>
+          ${m.open_id ? '' : `<button class="btn sm" data-linkmem="${esc(m.name)}">Lark紐付け</button>`}
           <button class="btn sm red" data-delmem="${m.id}">削除</button>
         </td>
-      </tr>`).join('') : '<tr><td colspan="5" class="muted">まだメンバーが登録されていません。下のフォームで追加してください（毎日自動でLark同期されます）。</td></tr>') + '</tbody></table>';
+      </tr>`).join('') : '<tr><td colspan="5" class="muted">まだメンバーが登録されていません。下のフォームで追加してください（追加時に氏名でLarkを検索して自動紐付けします）。</td></tr>') + '</tbody></table>';
   $('memBody').querySelectorAll('[data-savemem]').forEach(b => b.addEventListener('click', () => saveMember(b.dataset.savemem)));
   $('memBody').querySelectorAll('[data-delmem]').forEach(b => b.addEventListener('click', () => delMember(b.dataset.delmem)));
+  $('memBody').querySelectorAll('[data-linkmem]').forEach(b => b.addEventListener('click', () => linkMemberToLark(b.dataset.linkmem, b)));
 }
 async function addMember() {
   const name = $('newMemName').value.trim();
   const division_id = $('newMemDiv').value || null;
   if (!name) { gmsg(false, '氏名を入力してください'); return; }
-  const { error } = await sb.from('l1_members').insert({ name, division_id });
+  const { error } = await sb.from('l1_members').insert({ name, division_id, is_active: true });
   if (error) { gmsg(false, '追加に失敗: ' + error.message); return; }
   $('newMemName').value = '';
-  gmsg(true, 'メンバーを追加しました');
+  gmsg(true, `メンバーを追加しました。Larkから「${name}」を検索しています…`);
   await reloadAll();
+  await linkMemberToLark(name);   // open_id と ログインアカウントを補完
+}
+
+// 氏名を指定して1名だけLarkから紐付ける（open_id付与＋ログインアカウント発行）
+async function linkMemberToLark(name, btn) {
+  if (!name) return;
+  const label = btn ? btn.textContent : null;
+  if (btn) { btn.disabled = true; btn.textContent = '照会中…'; }
+  try {
+    const { data, error } = await sb.functions.invoke('l1-lark-link-member', { body: { name } });
+    if (error) { gmsg(false, `Lark紐付けに失敗: ${error.message}`); return; }
+    if (!data?.ok) {
+      gmsg(false, `Lark紐付けできませんでした: ${data?.error ?? '不明なエラー'}`);
+      return;
+    }
+    const pw = data.initial_password ? `／初期パスワード ${data.initial_password}（初回ログインで再設定）` : '';
+    gmsg(true, `「${data.name}」をLarkと紐付けました（ログイン用: ${data.login_email}${pw}）`);
+    await reloadAll();
+  } catch (e) {
+    gmsg(false, 'Lark紐付けに失敗: ' + String(e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+  }
 }
 async function saveMember(id) {
   const name = $(`mn-${id}`).value.trim();
