@@ -378,6 +378,19 @@ export function namesForDivision(members, divisionId, { requireOpenId = false, v
   return out.sort((a, b) => String(a.label).localeCompare(String(b.label), 'ja'));
 }
 
+/** 指定シーズンのイベントのみを抜き出す（前シーズンの履歴を表示させないためのフィルタ） */
+export function eventsForSeasons(events, seasonIds) {
+  const set = seasonIds instanceof Set ? seasonIds : new Set((seasonIds || []).filter(Boolean));
+  if (set.size === 0) return [];
+  return (events || []).filter(e => e && set.has(e.season_id));
+}
+
+/** 同一サイクル（同一期）に属するシーズンIDの一覧 */
+export function seasonIdsForCycle(seasons, cycle) {
+  if (!cycle) return [];
+  return (seasons || []).filter(s => s && s.cycle === cycle && s.id).map(s => s.id);
+}
+
 /** シーズン切替（管理画面用）: 現activeをfalse→対象をtrueの2段更新の順序を返す */
 export function seasonActivationPlan(seasons, targetSeasonId) {
   const current = (seasons || []).filter(s => s.is_active && s.id !== targetSeasonId);
