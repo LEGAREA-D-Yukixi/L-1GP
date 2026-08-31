@@ -14,7 +14,7 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif; background: var(--bg); color: var(--text); }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 16px; }
+  .wrap { max-width: none; margin: 0; padding: 16px 20px; }
   h1 { font-size: 20px; margin: 8px 0 12px; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
   .card h2 { font-size: 15px; margin: 0 0 12px; }
@@ -43,6 +43,12 @@
   .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; background: var(--panel2); color: var(--muted); }
   .badge.on { background: rgba(61,220,132,.15); color: var(--add); }
   td input, td select { min-width: 70px; }
+  /* 日本語が1文字ずつ縦積みになるのを防ぐ（文節内で改行しない） */
+  td.col-rule { min-width: 210px; word-break: keep-all; }
+  td.col-name { min-width: 80px; word-break: keep-all; }
+  td.col-note { max-width: 360px; }
+  /* 列が多い表は横スクロールで逃がす（縦積みさせない） */
+  #reqBody, #evBody, #indBody, #admBody, #aplBody, #memBody { overflow-x: auto; }
   .voided { opacity: .45; text-decoration: line-through; }
   .rank1 { color: var(--accent); font-weight: 800; }
   .pwwrap { position: relative; }
@@ -315,29 +321,35 @@ async function reloadAll() {
   state.requests = rq.data; state.events = ev.data; state.admins = ad.data;
   state.applicants = (apl && !apl.error) ? apl.data : [];
   state.members = (mem && !mem.error) ? mem.data : [];
-  // 個人成績はサーバー側で集計する（l1_27のRPC）。
+  // 個人成績はサーバー側で集計する（l1_28のRPC l1_individual_totals）。
   // l1_events_full に earner_name 列が無く、l1_events の直読みはRLSで拒否されるため、
   // クライアント集計はできない。失敗は沈黙させず画面に理由を出す。
   state.individual = null;
   state.individualError = null;
   if (state.canIndividual) {
-    const { data: ind, error: indErr } = await sb.rpc('l1_individual_standings');
+    const { data: ind, error: indErr } = await sb.rpc('l1_individual_totals');
     if (indErr) state.individualError = indErr.message || String(indErr);
     else state.individual = Array.isArray(ind) ? ind : [];
   }
   // 承認進捗（全通常管理者の承認が必須。l1_25で追加したRPC）
   state.progress = new Map();
   state.requiredApprovals = 0;
+  state.progressError = null;
   try {
-    const { data: pg } = await sb.rpc('l1_request_progress');
+    const { data: pg, error: pgErr } = await sb.rpc('l1_request_progress');
+    if (pgErr) throw pgErr;
     if (Array.isArray(pg) && pg.length) {
       for (const row of pg) state.progress.set(row.request_id, row);
       state.requiredApprovals = Number(pg[0].required) || 0;
     } else {
-      const { data: rc } = await sb.rpc('l1_regular_admin_count');
+      const { data: rc, error: rcErr } = await sb.rpc('l1_regular_admin_count');
+      if (rcErr) throw rcErr;
       state.requiredApprovals = Number(rc) || 0;
     }
-  } catch (_) { /* l1_25未適用でも画面は動かす */ }
+  } catch (e) {
+    // 承認可否に直結するため沈黙させない（0人と誤表示すると原因が分からなくなる）
+    state.progressError = e?.message || String(e);
+  }
   renderAll();
 }
 function renderAll() {
@@ -355,7 +367,16 @@ function renderRequests() {
   const sp = !!state.canIndividual; // 特別管理者か
   const prog = state.progress instanceof Map ? state.progress : new Map();
   const req0 = Number(state.requiredApprovals) || 0;
-  $('reqBody').innerHTML = `<table><thead><tr><th>状態</th><th>承認</th><th>申請日</th><th>発生日</th><th>Division</th><th>項目</th><th>pt</th><th>獲得者</th><th>申請者</th><th>詳細</th><th></th></tr></thead><tbody>` +
+  // 承認できない原因を最優先で表示する（0人と誤表示させない）
+  const banner = state.progressError
+    ? `<div class="msg ngmsg" style="display:block">承認機能を読み込めませんでした: ${esc(state.progressError)}`
+      + (/does not exist|schema cache|could not find/i.test(state.progressError)
+          ? '<br>l1_25_all_admin_approval.sql が未適用です。適用するまで承認できません。' : '')
+      + `</div>`
+    : (req0 === 0
+        ? `<div class="msg ngmsg" style="display:block">通常管理者が0名のため承認できません。管理者タブで通常管理者（個人成績の閲覧=なし）を登録してください。</div>`
+        : '');
+  $('reqBody').innerHTML = banner + `<table><thead><tr><th>状態</th><th>承認</th><th>申請日</th><th>発生日</th><th>Division</th><th>項目</th><th>pt</th><th>獲得者</th><th>申請者</th><th>詳細</th><th></th></tr></thead><tbody>` +
     state.requests.map(q => {
       const r = rOf(q.rule_id);
       const variable = !!r?.is_variable;
@@ -387,15 +408,15 @@ function renderRequests() {
         <td class="muted" style="white-space:nowrap">${q.created_at ? esc(new Date(q.created_at).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })) : ''}</td>
         <td>${esc(q.occurred_on)}</td>
         <td>${esc(dName(q.division_id))}</td>
-        <td>${esc(r ? r.category + '｜' + r.label : '(不明)')}</td>
+        <td class="col-rule">${esc(r ? r.category + '｜' + r.label : '(不明)')}</td>
         <td>${variable
           ? (act.showPointsInput
               ? `<input type="number" step="1" value="${q.points ?? ''}" id="qp-${q.id}" style="width:90px">`
               : `<span class="muted">特別承認時に確定</span>`)
           : `<span class="${(q.points ?? 0) >= 0 ? 'add' : 'deduct'}">${esc(formatPoints(q.points))}</span>`}</td>
-        <td>${esc(q.earner_name ?? '')}</td>
-        <td>${esc(q.requester_name)}</td>
-        <td class="muted" style="max-width:220px">${esc(q.note ?? '')}</td>
+        <td class="col-name">${esc(q.earner_name ?? '')}</td>
+        <td class="col-name">${esc(q.requester_name)}</td>
+        <td class="muted col-note">${esc(q.note ?? '')}</td>
         <td style="white-space:nowrap">${actions}</td>
       </tr>`;
     }).join('') + '</tbody></table>'
@@ -656,7 +677,7 @@ function renderIndividual() {
     $('indBody').innerHTML = `<div style="color:#c0392b;font-weight:700">個人成績を読み込めませんでした</div>`
       + `<div class="muted" style="margin-top:4px">${esc(state.individualError)}</div>`
       + (/does not exist|schema cache|could not find/i.test(state.individualError)
-          ? `<div class="muted" style="margin-top:4px">l1_27（l1_individual_standings）が未適用の可能性があります。</div>` : '');
+          ? `<div class="muted" style="margin-top:4px">l1_28（l1_individual_totals）が未適用の可能性があります。</div>` : '');
     return;
   }
   if (state.individual === null) {
