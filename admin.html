@@ -859,7 +859,14 @@ async function linkMemberToLark(name, btn) {
   if (btn) { btn.disabled = true; btn.textContent = '照会中…'; }
   try {
     const { data, error } = await sb.functions.invoke('l1-lark-link-member', { body: { name } });
-    if (error) { gmsg(false, `Lark紐付けに失敗: ${error.message}`); return; }
+    if (error) {
+      // HTTPステータスすら返っていない場合は未デプロイ or CORSプリフライト失敗
+      const hint = /failed to send a request/i.test(error.message || '')
+        ? '（Edge Function l1-lark-link-member が未デプロイか、--no-verify-jwt を付けずにデプロイされている可能性があります）'
+        : '';
+      gmsg(false, `Lark紐付けに失敗: ${error.message}${hint}`);
+      return;
+    }
     if (!data?.ok) {
       gmsg(false, `Lark紐付けできませんでした: ${data?.error ?? '不明なエラー'}`);
       return;
