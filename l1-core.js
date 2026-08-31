@@ -303,6 +303,38 @@ export function buildFeed({ events, divisions, rules, limit = 50 }) {
     });
 }
 
+/**
+ * 申請承認ボタンの出し分け（全通常管理者の承認を必須とする方式）。
+ * 仕様:
+ *   ・pending の承認は通常管理者のみ。特別権限者は pending 段階では確定できない。
+ *   ・通常管理者 全員 の承認が揃うと pending_final へ遷移（遷移判定はサーバー側）。
+ *   ・可変ポイントは特別承認者が最終決定するため、pending 段階では入力させない。
+ *   ・却下は権限を問わず1人で成立するため、ボタンは常に表示。
+ * @returns {{mode:string,label:string,disabled:boolean,showPointsInput:boolean,note:string,canReject:boolean}}
+ */
+export function approvalAction({ status, isSpecial = false, iApproved = false, approved = 0, required = 0, isVariable = false } = {}) {
+  const base = { label: '', disabled: false, showPointsInput: false, note: '', canReject: true };
+  const prog = `${approved}/${required}`;
+
+  if (status === 'pending_final') {
+    return isSpecial
+      ? { ...base, mode: 'final', label: '特別承認（確定）', showPointsInput: !!isVariable }
+      : { ...base, mode: 'wait_special', note: '特別管理者の承認待ち' };
+  }
+
+  // status === 'pending'（既定）
+  if (required <= 0) {
+    return { ...base, mode: 'no_regular_admin', note: '通常管理者が0人のため承認できません（管理者設定を確認してください）' };
+  }
+  if (isSpecial) {
+    return { ...base, mode: 'wait_regular', note: `通常管理者の承認待ち（${prog}）` };
+  }
+  if (iApproved) {
+    return { ...base, mode: 'approved', label: '承認済み', disabled: true, note: `（${prog}）` };
+  }
+  return { ...base, mode: 'approve', label: `承認（1次 ${prog}）` };
+}
+
 /** シーズン切替（管理画面用）: 現activeをfalse→対象をtrueの2段更新の順序を返す */
 export function seasonActivationPlan(seasons, targetSeasonId) {
   const current = (seasons || []).filter(s => s.is_active && s.id !== targetSeasonId);
