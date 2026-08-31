@@ -681,10 +681,15 @@ async function submitRequest() {
 // メンバー名簿を読み込み: 申請者名の自動入力（ログイン氏名）＋獲得者プルダウン
 let formMembers = []; // {name, division_id}
 async function loadMembersIntoForm() {
-  try {
-    const { data: rows } = await sb.from('l1_member_names').select('name,is_active,division_id').order('name');
+  // l1_member_names ビュー経由（所有者権限で動くため anon からも読める）
+  const { data: rows, error } = await sb.from('l1_member_names')
+    .select('name,is_active,division_id').order('name');
+  if (error) {
+    formMembers = [];
+    console.error('名簿の取得に失敗:', error.message);
+  } else {
     formMembers = (rows || []).filter(r => r.is_active !== false && r.name);
-  } catch { formMembers = []; }
+  }
   const myName = (loginSession && loginSession.name) ? loginSession.name : '';
 
   // 申請者名: ログイン氏名を自動入力＆読取専用
@@ -732,13 +737,28 @@ let loginSession = null;   // { name }
 let loginNames = [];       // ログイン氏名の候補（検索用に保持）
 // ログイン氏名プルダウン（在籍メンバー全員）
 async function populateLoginNames() {
-  try {
-    const { data } = await sb.from('l1_member_names').select('name,is_active').order('name');
-    loginNames = [...new Set((data || []).filter(r => r.is_active !== false).map(r => r.name).filter(Boolean))]
-      .sort((a, b) => String(a).localeCompare(String(b), 'ja'));
-    // 在籍メンバー全員が対象でDivisionで絞り込めないため、リアルタイム検索を付与
-    attachSearchSelect($('dashLgName'), () => loginNames, { emptyLabel: '氏名を選択' });
-  } catch { /* 取得失敗時は空のまま */ }
+  // l1_member_names ビュー経由（所有者権限で動くため anon からも読める）
+  const { data, error } = await sb.from('l1_member_names')
+    .select('name,is_active').order('name');
+  if (error) {
+    // 沈黙させると「プルダウンが空」だけが見えて原因が分からなくなる
+    const sel = $('dashLgName');
+    if (sel) sel.innerHTML = '<option value="">氏名を読み込めませんでした</option>';
+    const msgEl = $('dashLgMsg');
+    if (msgEl) {
+      const hint = /does not exist|schema cache|could not find|relation/i.test(error.message || '')
+        ? '（l1_member_names ビューの列構成を確認してください）' : '';
+      msgEl.textContent = `名簿を読み込めませんでした: ${error.message}${hint}`;
+      msgEl.className = 'msg ngmsg';
+      msgEl.style.display = 'block';
+    }
+    console.error('名簿の取得に失敗:', error.message);
+    return;
+  }
+  loginNames = [...new Set((data || []).filter(r => r.is_active !== false).map(r => r.name).filter(Boolean))]
+    .sort((a, b) => String(a).localeCompare(String(b), 'ja'));
+  // 在籍メンバー全員が対象でDivisionで絞り込めないため、リアルタイム検索を付与
+  attachSearchSelect($('dashLgName'), () => loginNames, { emptyLabel: '氏名を選択' });
 }
 // 申請できる氏名か（申請権限者 または 管理者）
 async function canApplyName(name) {
