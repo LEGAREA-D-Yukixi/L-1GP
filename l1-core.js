@@ -391,6 +391,21 @@ export function seasonIdsForCycle(seasons, cycle) {
   return (seasons || []).filter(s => s && s.cycle === cycle && s.id).map(s => s.id);
 }
 
+/**
+ * 順位カードの表示フラグ（1位＝チャンピオン扱い / 最下位＝危険色）。
+ * 全Divisionが同点で並んだ場合は maxRank === 1 になるため、最下位は作らず全員を1位扱いにする。
+ */
+export function podiumFlags({ rank, maxRank, total } = {}) {
+  const r = Number(rank) || 0;
+  const mx = Number(maxRank) || 0;
+  const t = Number(total) || 0;
+  return {
+    isChamp: r === 1 && t > 0,
+    // mx > 1 が「順位に差がある」条件。全員同率1位なら最下位は存在しない。
+    isLast: mx > 1 && r === mx && t > 1,
+  };
+}
+
 /** シーズン切替（管理画面用）: 現activeをfalse→対象をtrueの2段更新の順序を返す */
 export function seasonActivationPlan(seasons, targetSeasonId) {
   const current = (seasons || []).filter(s => s.is_active && s.id !== targetSeasonId);

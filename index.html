@@ -365,7 +365,7 @@ import {
   isBlackout, isAnnualBlackout, seasonForDate, calcStandingsCarry, calcAnnualStandings,
   validateRequestInput, groupRules, buildFeed, formatPoints, seasonBaseline, pointsBar, pyramidWidth, annualTermLabel, rankGaps, leadOverSecond,
   fiscalTerm, isSecondHalf, seasonCountdown,
-  filterNameItems, eventsForSeasons, seasonIdsForCycle,
+  filterNameItems, eventsForSeasons, seasonIdsForCycle, podiumFlags,
 } from './l1-core.js';
 import { ICON_DATA, TROPHY, DEFAULT_ICON } from './l1-icons.js';
 
@@ -444,8 +444,8 @@ function renderPyramid(container, rows, baseline) {
   container.innerHTML = '<div id="podium"></div>';
   const podium = container.querySelector('#podium');
   rows.forEach((r, i) => {
-    const isChamp = r.rank === 1;
-    const isLast = r.rank === maxRank && total > 1;
+    // 全Divisionが同率1位のときは最下位を作らず、全員を1位扱いにする
+    const { isChamp, isLast } = podiumFlags({ rank: r.rank, maxRank, total });
     const width = pyramidWidth(r.rank, total);
     const bar = pointsBar({ points:r.points, baseline });
     // メダル色は「順位」で決定（同順位は同じ色）。最下位は危険色。
