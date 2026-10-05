@@ -220,6 +220,18 @@
   .blackout p { color:var(--muted); font-size:14px; margin:4px 0; }
 
   .msg { border-radius:8px; padding:11px 13px; font-size:13px; margin-top:12px; display:none; }
+  /* 申請状況タブ */
+  .reqtbl { width:100%; border-collapse:collapse; font-size:14px; }
+  .reqtbl th { text-align:left; padding:8px 10px; color:var(--muted); font-weight:700;
+               border-bottom:1px solid rgba(120,180,255,.25); white-space:nowrap; }
+  .reqtbl td { padding:10px; border-bottom:1px solid rgba(120,180,255,.12); vertical-align:top; }
+  .reqtbl tr:last-child td { border-bottom:0; }
+  .reqtbl td.col-rule { min-width:200px; word-break:keep-all; }
+  .reqtbl .apr { display:inline-block; padding:2px 8px; border-radius:999px; font-weight:800;
+                 background:rgba(120,180,255,.15); border:1px solid rgba(120,180,255,.35); }
+  .btn.sm { padding:6px 12px; font-size:13px; }
+  .btn.sm.red { background:var(--deduct); color:#fff; border-color:transparent; }
+  .btn.sm.red[disabled] { opacity:.6; cursor:default; }
   .msg.okmsg { background:rgba(56,224,138,.12); color:var(--add); display:block; border:1px solid rgba(56,224,138,.3); }
   .msg.ngmsg { background:rgba(255,85,110,.12); color:var(--deduct); display:block; white-space:pre-wrap; border:1px solid rgba(255,85,110,.3); }
   .hidden { display:none !important; }
@@ -286,6 +298,7 @@
     <button id="tabAnnual">年間集計</button>
     <button id="tabCriteria">判定基準</button>
     <button id="tabApply">ポイント申請</button>
+    <button id="tabMyReq">申請状況</button>
   </div>
 
   <div id="loading">読み込み中…</div>
@@ -350,6 +363,18 @@
       <textarea id="apNote" rows="3" maxlength="2000" placeholder="内容の補足があれば記入"></textarea>
       <button class="btn" id="apSubmit">申請する</button>
       <div id="apMsg" class="msg"></div>
+    </div>
+  </section>
+
+  <!-- 申請状況（自分の未承認申請のみ） -->
+  <section id="secMyReq" class="hidden">
+    <div class="banner"><span class="tri">▶▶</span>申請状況<span class="tri">◀◀</span></div>
+    <div class="card">
+      <div class="muted" style="margin-bottom:8px">
+        自分が申請したもののうち、<b>運営の承認が完了していない申請</b>のみ表示します。取り消したい場合は削除してください。
+      </div>
+      <div id="myReqBody"></div>
+      <div id="myReqMsg" class="msg"></div>
     </div>
   </section>
 
@@ -713,8 +738,79 @@ function populateEarnerByDivision() {
 }
 
 // ---------- 申請の認証・権限ゲート ----------
+// ---------- 申請状況（自分の未承認申請のみ） ----------
+let myReqRows = null;      // null=未取得 / 配列=取得済み
+let myReqError = null;
+
+async function loadMyRequests() {
+  myReqRows = null; myReqError = null;
+  renderMyRequests();
+  // 本人判定はサーバー側で行う（氏名をクライアントから渡すと他人の申請を覗けてしまうため引数なし）
+  const { data, error } = await sb.rpc('l1_my_pending_requests');
+  if (error) {
+    myReqError = error.message || String(error);
+  } else {
+    myReqRows = Array.isArray(data) ? data : [];
+  }
+  renderMyRequests();
+}
+
+function renderMyRequests() {
+  const body = $('myReqBody');
+  if (!body) return;
+  if (myReqError) {
+    const hint = /does not exist|schema cache|could not find/i.test(myReqError)
+      ? '<br>l1_29（l1_my_pending_requests）が未適用の可能性があります。' : '';
+    body.innerHTML = `<div style="color:#ff8a80;font-weight:700">申請状況を読み込めませんでした</div>`
+      + `<div class="muted" style="margin-top:4px">${esc(myReqError)}${hint}</div>`;
+    return;
+  }
+  if (myReqRows === null) { body.innerHTML = '<div class="muted">読み込み中…</div>'; return; }
+  if (myReqRows.length === 0) {
+    body.innerHTML = '<div class="muted">承認待ちの申請はありません。</div>';
+    return;
+  }
+  body.innerHTML = `<div style="overflow-x:auto"><table class="reqtbl"><thead><tr>`
+    + `<th>申請日</th><th>発生日</th><th>Division</th><th>項目</th><th style="text-align:right">pt</th>`
+    + `<th>獲得者</th><th>詳細</th><th>承認</th><th></th></tr></thead><tbody>`
+    + myReqRows.map(r => {
+        const pts = Number(r.points || 0);
+        const ap = Number(r.approved || 0), rq = Number(r.required || 0);
+        return `<tr>
+          <td class="muted" style="white-space:nowrap">${esc(r.created_at ? new Date(r.created_at).toLocaleString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '')}</td>
+          <td style="white-space:nowrap">${esc(r.occurred_on ?? '')}</td>
+          <td>${esc(r.division_name ?? '')}</td>
+          <td class="col-rule">${esc([r.category, r.label].filter(Boolean).join('｜'))}</td>
+          <td style="text-align:right;white-space:nowrap" class="${pts >= 0 ? 'add' : 'deduct'}">${esc(formatPoints(pts))}</td>
+          <td style="white-space:nowrap">${esc(r.earner_name ?? '')}</td>
+          <td class="muted">${esc(r.note ?? '')}</td>
+          <td style="text-align:center;white-space:nowrap"><span class="apr">${ap}/${rq}</span></td>
+          <td style="white-space:nowrap"><button class="btn sm red" data-delreq="${esc(r.id)}">削除</button></td>
+        </tr>`;
+      }).join('')
+    + '</tbody></table></div>';
+  body.querySelectorAll('[data-delreq]').forEach(b =>
+    b.addEventListener('click', () => deleteMyRequest(b.dataset.delreq, b)));
+}
+
+async function deleteMyRequest(id, btn) {
+  if (!id) return;
+  if (!confirm('この申請を削除します。よろしいですか？\n（削除すると元に戻せません）')) return;
+  const msg = $('myReqMsg');
+  if (btn) { btn.disabled = true; btn.textContent = '削除中…'; }
+  const { error } = await sb.rpc('l1_delete_my_request', { p_request_id: id });
+  if (error) {
+    if (msg) { msg.className = 'msg ngmsg'; msg.style.display = 'block'; msg.textContent = '削除に失敗しました: ' + error.message; }
+    if (btn) { btn.disabled = false; btn.textContent = '削除'; }
+    return;
+  }
+  if (msg) { msg.className = 'msg okmsg'; msg.style.display = 'block'; msg.textContent = '申請を削除しました。'; }
+  await loadMyRequests();
+}
+
 function applyView(mode) { // 'form' のみ使用（グローバルログイン集約後）
   $('applyForm').classList.toggle('hidden', mode !== 'form');
+  if (mode === 'form') { myReqRows = null; }   // 申請後に申請状況を取り直させる
 }
 // ---------- Apple風の目アイコン（オリジナル線画） ----------
 function eyeIcon(visible) { // visible=パスワードが表示中か（表示中は斜線付き＝「隠す」）
@@ -826,6 +922,7 @@ async function enterDashboard() {
   let canApply = false;
   try { canApply = await canApplyName(myName); } catch { canApply = false; }
   $('tabApply').classList.toggle('hidden', !canApply);
+  $('tabMyReq').classList.toggle('hidden', !canApply);   // 申請状況も申請権限者のみ
   $('whoami').textContent = myName;
   $('secSeason').classList.remove('hidden');
   switchTab('tabSeason');
@@ -845,11 +942,12 @@ async function dashSubmitNewPassword() {
 async function dashLogout() { await sb.auth.signOut(); location.reload(); }
 
 function switchTab(tab) {
-  const map = [['tabSeason','secSeason'],['tabAnnual','secAnnual'],['tabCriteria','secCriteria'],['tabApply','secApply']];
+  const map = [['tabSeason','secSeason'],['tabAnnual','secAnnual'],['tabCriteria','secCriteria'],['tabApply','secApply'],['tabMyReq','secMyReq']];
   for (const [btn, sec] of map) { $(btn).classList.toggle('active', btn === tab); $(sec).classList.toggle('hidden', btn !== tab); }
   if (tab === 'tabAnnual') renderAnnual();
   if (tab === 'tabCriteria') renderCriteria();
   if (tab === 'tabApply') { applyView('form'); loadMembersIntoForm(); }
+  if (tab === 'tabMyReq') loadMyRequests();
   if (tab === 'tabSeason') requestAnimationFrame(() => fitPodium($('standingsBody')));
 }
 window.addEventListener('resize', () => { const s = $('secSeason'); if (s && !s.classList.contains('hidden')) fitPodium($('standingsBody')); });
@@ -940,6 +1038,7 @@ async function init() {
   $('tabAnnual').addEventListener('click', () => switchTab('tabAnnual'));
   $('tabCriteria').addEventListener('click', () => switchTab('tabCriteria'));
   $('tabApply').addEventListener('click', () => switchTab('tabApply'));
+  $('tabMyReq').addEventListener('click', () => switchTab('tabMyReq'));
   $('apRule').addEventListener('change', updateApPreview);
   $('apDivision').addEventListener('change', populateEarnerByDivision);
   $('apSubmit').addEventListener('click', submitRequest);

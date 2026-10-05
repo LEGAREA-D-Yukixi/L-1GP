@@ -145,7 +145,7 @@
     <!-- 個人成績 -->
     <section id="tabIndividual" class="card hidden">
       <h2>個人成績ランキング</h2>
-      <div class="muted" style="margin-bottom:8px">メンバー名簿に登録されている人を、獲得ポイントの合計でランキング表示します。</div>
+      <div class="muted" style="margin-bottom:8px">開催中シーズンが属する<b>今期のみ</b>を対象に、獲得者名で集計してランキング表示します。期が変わるとリセットされます。</div>
       <div id="indBody" style="margin-top:12px"></div>
     </section>
 
@@ -455,7 +455,7 @@ function renderRequests() {
         <td style="white-space:nowrap">${actions}</td>
       </tr>`;
     }).join('') + '</tbody></table>'
-    + `<div class="muted" style="margin-top:6px">通常管理者<b>全員（${req0}名）</b>の承認が揃うと「特別承認待ち」になり、特別管理者へ通知されます。特別管理者が承認するとダッシュボードへ反映されます。可変ポイントの金額は特別承認時に確定します。却下は管理者1名で成立します。</div>`;
+    + `<div class="muted" style="margin-top:6px">通常管理者<b>全員（${req0}名）</b>の承認が揃うと「特別承認待ち」になり、特別管理者へ通知されます。特別管理者が承認するとダッシュボードへ反映されます。可変ポイントの金額は特別承認時に確定します。却下は管理者1名で成立し、入力した却下理由が申請者へLarkで通知されます。</div>`;
 
   $('reqBody').querySelectorAll('[data-approve]').forEach(b => b.addEventListener('click', () => review(b.dataset.approve, 'approve')));
   $('reqBody').querySelectorAll('[data-reject]').forEach(b => b.addEventListener('click', () => review(b.dataset.reject, 'reject')));
@@ -471,7 +471,9 @@ async function review(id, action) {
     if (!Number.isInteger(v) || v === 0) { gmsg(false, '可変ポイントを入力してください（0以外の整数）'); return; }
     p_points = v;
   }
-  const p_comment = action === 'reject' ? (prompt('却下理由（任意）') ?? null) : null;
+  const p_comment = action === 'reject'
+    ? (prompt('却下理由を入力してください（申請者へLarkで通知されます）') ?? null)
+    : null;
   const { error } = await sb.rpc('l1_review_request', { p_request_id: id, p_action: action, p_points, p_comment });
   if (error) { gmsg(false, '処理に失敗: ' + error.message); return; }
   const prevStatus = q?.status;
@@ -727,7 +729,7 @@ function renderIndividual() {
     return;
   }
 
-  // サーバー側（l1_individual_standings）で集計済み。void除外・全シーズン対象。
+  // サーバー側（l1_individual_totals）で集計済み。void除外・今期(cycle)のみ対象。
   const rows = (state.individual || []).map(r => ({
     name: String(r.earner_name || '').trim(),
     division_id: r.division_id || null,
@@ -735,16 +737,24 @@ function renderIndividual() {
     cnt: Number(r.event_count || 0),
   })).filter(r => r.name);
 
+  // 対象期を表示（どの期の成績を見ているかを明示する）
+  const activeSeason = (state.seasons || []).find(x => x.is_active);
+  const cycleLabel = activeSeason && activeSeason.cycle ? String(activeSeason.cycle) : '';
+  const scope = cycleLabel
+    ? `<div class="muted" style="margin-bottom:6px">対象: <b>${esc(cycleLabel)}</b>（${esc(activeSeason.name ?? '')}）</div>`
+    : `<div class="muted" style="margin-bottom:6px;color:#c0392b">開催中のシーズンがありません。マスタタブでシーズンを有効化してください。</div>`;
+
   if (rows.length === 0) {
-    $('indBody').innerHTML = '<div class="muted">獲得者名が入ったポイント記録がまだありません。'
-      + '承認したポイントが反映されない場合は、l1_review_request が申請の獲得者名を l1_events にコピーしていない可能性があります。</div>';
+    $('indBody').innerHTML = scope
+      + `<div class="muted">${cycleLabel ? esc(cycleLabel) + 'の' : ''}ポイント記録はまだありません。`
+      + '前期までの記録は集計対象外です。</div>';
     return;
   }
   // 競争順位（同ptは同順位）
   const ranked = [];
   rows.forEach((r, i) => { const rank = (i > 0 && rows[i - 1].pts === r.pts) ? ranked[i - 1].rank : i + 1; ranked.push({ ...r, rank }); });
 
-  $('indBody').innerHTML = `<table><thead><tr><th>順位</th><th>獲得者</th><th>所属</th><th style="text-align:right">合計pt</th><th style="text-align:right">件数</th></tr></thead><tbody>` +
+  $('indBody').innerHTML = scope + `<table><thead><tr><th>順位</th><th>獲得者</th><th>所属</th><th style="text-align:right">合計pt</th><th style="text-align:right">件数</th></tr></thead><tbody>` +
     ranked.map(r => `<tr>
       <td style="text-align:center;font-weight:900" class="${r.rank === 1 ? 'rank1' : ''}">${r.rank}</td>
       <td>${esc(r.name)}</td>
