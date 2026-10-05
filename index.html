@@ -256,8 +256,13 @@
 <div class="shooting-layer" id="shootingLayer"></div>
 <div class="wrap">
 
+  <!-- 起動中プレースホルダ（ログイン判定が決まるまでの表示。ログイン画面のちらつき防止） -->
+  <div id="dashBoot" class="card">
+    <div class="muted" id="dashBootMsg">読み込み中…</div>
+  </div>
+
   <!-- ログイン（氏名＋パスワード / 内部はSupabase Auth） -->
-  <div id="dashLogin" class="card">
+  <div id="dashLogin" class="card hidden">
     <h2 style="margin-top:0">ログイン</h2>
     <div class="muted" style="margin-bottom:8px">メンバー名簿のお名前を選び、パスワードを入力してください。</div>
     <label for="dashLgName">お名前</label>
@@ -890,6 +895,29 @@ async function dashLogin() {
   msg.className = 'msg'; msg.textContent = '';
   await dashAfterAuth();
 }
+// localStorage に Supabase のセッションが残っているかを「通信せずに」判定する。
+// 有効性までは分からないが、起動直後にログイン画面を出すか伏せるかの判断には十分。
+// 実際の有効性は後続の getUser() で確認するため、安全性は変わらない。
+function hasStoredSession() {
+  try {
+    const ref = new URL(SUPABASE_URL).hostname.split('.')[0];
+    const raw = localStorage.getItem(`sb-${ref}-auth-token`);
+    if (!raw) return false;
+    const o = JSON.parse(raw);
+    return !!(o && (o.access_token || o.refresh_token));
+  } catch { return false; }
+}
+
+let loginNamesLoaded = false;
+async function showLoginGate() {
+  $('dashBoot')?.classList.add('hidden');
+  $('dashReset').classList.add('hidden');
+  $('dashMain').classList.add('hidden');
+  $('dashLogin').classList.remove('hidden');
+  // 氏名一覧はログイン画面を出すときだけ取得する（ログイン済みなら不要な通信）
+  if (!loginNamesLoaded) { loginNamesLoaded = true; await populateLoginNames(); }
+}
+
 async function dashAfterAuth() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
@@ -898,19 +926,21 @@ async function dashAfterAuth() {
   try { const { data } = await sb.rpc('l1_my_member_active'); active = !!data; } catch { active = false; }
   if (!active) {
     await sb.auth.signOut();
+    await showLoginGate();
     const msg = $('dashLgMsg'); msg.className = 'msg ngmsg';
     msg.textContent = 'このアカウントは現在ご利用いただけません（名簿に登録がありません）。';
     return;
   }
   let mustReset = false;
   try { const { data } = await sb.rpc('l1_my_member_must_reset'); mustReset = !!data; } catch { mustReset = false; }
-  if (mustReset) { $('dashLogin').classList.add('hidden'); $('dashReset').classList.remove('hidden'); return; }
+  if (mustReset) { $('dashBoot')?.classList.add('hidden'); $('dashLogin').classList.add('hidden'); $('dashReset').classList.remove('hidden'); return; }
   await enterDashboard();
 }
 async function enterDashboard() {
   let myName = '';
   try { const { data } = await sb.rpc('l1_my_member_name'); myName = data || ''; } catch {}
   loginSession = { name: myName };
+  $('dashBoot')?.classList.add('hidden');
   $('dashLogin').classList.add('hidden');
   $('dashReset').classList.add('hidden');
   $('dashMain').classList.remove('hidden');
@@ -1032,7 +1062,6 @@ async function init() {
   initEye('dashLgEye', 'dashLgPass');
   initEye('dashNpw1Eye', 'dashNpw1');
   initEye('dashNpw2Eye', 'dashNpw2');
-  await populateLoginNames();
   // イベント登録（本体はログイン後に表示）
   $('tabSeason').addEventListener('click', () => switchTab('tabSeason'));
   $('tabAnnual').addEventListener('click', () => switchTab('tabAnnual'));
@@ -1046,11 +1075,22 @@ async function init() {
   $('dashLgPass').addEventListener('keydown', e => { if (e.key === 'Enter') dashLogin(); });
   $('dashNpwBtn').addEventListener('click', dashSubmitNewPassword);
   $('logoutLink').addEventListener('click', e => { e.preventDefault(); dashLogout(); });
-  // 既存セッションがあれば自動ログイン（在籍チェックあり）
+  // 起動直後の表示を「通信を待たずに」決める（ログイン画面のちらつき防止）
+  const maybeLoggedIn = hasStoredSession();
+  if (maybeLoggedIn) {
+    // ログイン済みらしい → ログイン画面は出さず、読み込み中のまま待つ
+    const bm = $('dashBootMsg'); if (bm) bm.textContent = 'ダッシュボードを読み込み中…';
+  } else {
+    // セッションが無いことは確定なので、即ログイン画面を出す
+    await showLoginGate();
+  }
+  // 既存セッションがあれば自動ログイン（トークンの有効性はここで確認。在籍チェックあり）
   try {
     const { data: { user } } = await sb.auth.getUser();
     if (user) await dashAfterAuth();
+    else await showLoginGate();
   } catch (e) {
+    await showLoginGate();
     showErr('初期化に失敗しました。\n' + (e?.message ?? e));
   }
 }
