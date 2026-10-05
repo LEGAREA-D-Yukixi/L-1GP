@@ -61,6 +61,17 @@
     background:radial-gradient(circle at 42% 38%, #fff7e0 0%, #ffe37a 9%, #ffb020 22%, #ff5a00 40%, #e02200 58%, #7a0f00 80%, #240400 100%);
     box-shadow:0 0 60px 18px rgba(255,120,30,.8), 0 0 160px 60px rgba(255,50,0,.55), 0 0 300px 140px rgba(150,15,0,.42);
     animation:met-pulse .9s ease-in-out infinite alternate; }
+  /* --- SUPERPOWER 119（5000分の1） --- */
+  .fly119 { position:fixed; left:0; top:0; z-index:40; pointer-events:none; will-change:transform;
+            filter:drop-shadow(0 0 14px rgba(255,170,40,.85)) drop-shadow(0 0 34px rgba(255,90,0,.5)); }
+  .fly119 img { display:block; width:100%; height:100%; border-radius:50%;
+                border:3px solid rgba(255,190,60,.9); box-shadow:0 0 22px rgba(255,150,0,.8) inset; }
+  .fly119 .f-aura { position:absolute; inset:-18%; border-radius:50%; pointer-events:none;
+                    background:radial-gradient(circle, rgba(255,190,60,.45) 0%, rgba(255,120,0,.18) 45%, transparent 70%); }
+  /* ひび割れオーバーレイ */
+  .crack-layer { position:fixed; inset:0; z-index:60; pointer-events:none; opacity:0; }
+  .crack-layer.on { opacity:1; }
+  .crack-flash { position:fixed; inset:0; z-index:61; pointer-events:none; background:#fff; opacity:0; }
   .meteor .met-core { position:absolute; left:29%; top:25%; width:44%; height:44%; border-radius:50%;
     background:radial-gradient(circle, #fffef7 0%, #ffe9a8 46%, rgba(255,190,70,0) 74%);
     mix-blend-mode:screen; animation:met-flicker .13s steps(2) infinite; }
@@ -220,6 +231,37 @@
   .blackout p { color:var(--muted); font-size:14px; margin:4px 0; }
 
   .msg { border-radius:8px; padding:11px 13px; font-size:13px; margin-top:12px; display:none; }
+  /* 5000分の1のレア演出（ハエのように飛び回って画面に激突） */
+  .fly-hero { position:fixed; left:0; top:0; z-index:60; pointer-events:none;
+              will-change:transform; filter:drop-shadow(0 0 18px rgba(255,190,60,.55)); }
+  .fly-hero img { display:block; width:100%; height:100%; object-fit:contain; }
+  /* 大爆発（canvasでパーティクルと衝撃波を描く） */
+  #boomLayer { position:fixed; inset:0; z-index:72; pointer-events:none; display:none; }
+  #boomLayer.on { display:block; }
+  #boomLayer canvas { width:100%; height:100%; display:block; }
+  #flashLayer { position:fixed; inset:0; z-index:74; pointer-events:none; opacity:0;
+                background:#fff; mix-blend-mode:screen; }
+  .shake { animation: scr-shake .62s cubic-bezier(.36,.07,.19,.97) both; }
+  .shake-hard { animation: scr-shake-hard .52s cubic-bezier(.36,.07,.19,.97) both; }
+  @keyframes scr-shake-hard {
+    8%,92%  { transform:translate3d(-9px,7px,0) rotate(-.5deg) }
+    18%,82% { transform:translate3d(18px,-13px,0) rotate(.7deg) }
+    28%,48%,68% { transform:translate3d(-30px,19px,0) rotate(-1deg) }
+    38%,58% { transform:translate3d(30px,-19px,0) rotate(1deg) }
+    100%    { transform:none }
+  }
+  @keyframes scr-shake {
+    10%,90% { transform:translate3d(-3px,2px,0) }
+    20%,80% { transform:translate3d(6px,-4px,0) }
+    30%,50%,70% { transform:translate3d(-12px,6px,0) }
+    40%,60% { transform:translate3d(12px,-6px,0) }
+    100% { transform:none }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fly-hero, #boomLayer, #flashLayer { display:none !important; }
+    .shake { animation:none !important; }
+  }
+
   /* 申請状況タブ */
   .reqtbl { width:100%; border-collapse:collapse; font-size:14px; }
   .reqtbl th { text-align:left; padding:8px 10px; color:var(--muted); font-weight:700;
@@ -254,6 +296,8 @@
 <body>
 <div class="bgfx"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
 <div class="shooting-layer" id="shootingLayer"></div>
+<div id="boomLayer" aria-hidden="true"><canvas id="boomCanvas"></canvas></div>
+<div id="flashLayer" aria-hidden="true"></div>
 <div class="wrap">
 
   <!-- 起動中プレースホルダ（ログイン判定が決まるまでの表示。ログイン画面のちらつき防止） -->
@@ -397,7 +441,7 @@ import {
   fiscalTerm, isSecondHalf, seasonCountdown,
   filterNameItems, eventsForSeasons, seasonIdsForCycle, podiumFlags,
 } from './l1-core.js';
-import { ICON_DATA, TROPHY, DEFAULT_ICON } from './l1-icons.js';
+import { ICON_DATA, TROPHY, DEFAULT_ICON, SUPERHERO } from './l1-icons.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = id => document.getElementById(id);
@@ -1052,9 +1096,266 @@ function spawnMeteor() {
 function scheduleShootingStar() {
   const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (prefersReduced) return;
-  if (Math.random() < 0.001) spawnMeteor();   // 1000分の1で巨大隕石
+  const r = Math.random();
+  if (r < 0.0002) spawnFlyHero();            // 5000分の1でレアキャラが飛び回る
+  else if (r < 0.001) spawnMeteor();         // 1000分の1で巨大隕石
   else spawnShootingStar();
   setTimeout(scheduleShootingStar, 2600 + Math.random() * 4200); // ランダム間隔
+}
+
+// ===== 5000分の1のレア演出 =====
+// ハエのように不規則に飛び回り（1分）、最後に画面へ激突してヒビが入る（30秒）
+const FLY_MS = 60000;    // 飛行時間
+let flyHeroRunning = false;
+
+function spawnFlyHero() {
+  if (flyHeroRunning) return;   // 多重起動を防ぐ
+  flyHeroRunning = true;
+
+  const size = Math.max(90, Math.min(window.innerWidth, window.innerHeight) * 0.18);
+  const el = document.createElement('div');
+  el.className = 'fly-hero';
+  el.style.width = size + 'px';
+  el.style.height = size + 'px';
+  const img = document.createElement('img');
+  img.src = SUPERHERO; img.alt = '';
+  el.appendChild(img);
+  document.body.appendChild(el);
+
+  // 位置・速度。目標速度へ補間して追従するため、急な方向転換でもカクつかない
+  let x = Math.random() * (window.innerWidth - size);
+  let y = Math.random() * (window.innerHeight - size);
+  let vx = 0, vy = 0;              // 実際の速度（px/秒）
+  let tx = 0, ty = 0;              // 目標速度（px/秒）
+  let tilt = 0, flip = 1;          // 表示用の傾きと向き（これも補間する）
+  let turnAt = 0, hoverAt = 0, hoverUntil = 0;
+  // 震えは乱数ではなく正弦波の合成にする（毎フレームの乱数はチラつきの原因）
+  const ph1 = Math.random() * 99, ph2 = Math.random() * 99;
+  const start = performance.now();
+  let last = start;
+  let raf = 0;
+
+  const retarget = (now) => {
+    const sp = 260 + Math.random() * 520;        // px/秒
+    const ang = Math.random() * Math.PI * 2;
+    tx = Math.cos(ang) * sp;
+    ty = Math.sin(ang) * sp;
+    turnAt = now + 260 + Math.random() * 620;
+  };
+  retarget(start);
+
+  const step = (now) => {
+    const t = Math.max(0, now - start);
+    if (t >= FLY_MS) { crashFlyHero(el, x, y, size); return; }
+
+    // 経過時間ベースで動かす（フレームレートが変わっても速度が変わらない）
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+    last = now;
+    const W = window.innerWidth, H = window.innerHeight;
+
+    if (now > hoverUntil) {
+      if (now > turnAt) retarget(now);
+      if (now > hoverAt) {
+        hoverAt = now + 2600 + Math.random() * 5200;
+        if (Math.random() < 0.4) { hoverUntil = now + 320 + Math.random() * 760; tx = 0; ty = 0; }
+      }
+    } else { tx = 0; ty = 0; }
+
+    // 目標速度へ滑らかに追従（指数補間。急な転換でも軌道が折れずに弧を描く）
+    const k = 1 - Math.pow(0.0022, dt);
+    vx += (tx - vx) * k;
+    vy += (ty - vy) * k;
+
+    // 羽ばたきの震え（連続関数なのでカクつかない）
+    const sec = t / 1000;
+    const jx = Math.sin(sec * 23 + ph1) * 2.6 + Math.sin(sec * 9.3 + ph2) * 1.6;
+    const jy = Math.cos(sec * 27 + ph2) * 2.4 + Math.cos(sec * 7.7 + ph1) * 1.5;
+
+    x += vx * dt + jx * dt * 12;
+    y += vy * dt + jy * dt * 12;
+
+    // 壁で跳ね返る（目標速度も反転させて即座に壁から離れる）
+    if (x < 0)          { x = 0;          vx = Math.abs(vx); tx = Math.abs(tx); }
+    if (y < 0)          { y = 0;          vy = Math.abs(vy); ty = Math.abs(ty); }
+    if (x > W - size)   { x = W - size;   vx = -Math.abs(vx); tx = -Math.abs(tx); }
+    if (y > H - size)   { y = H - size;   vy = -Math.abs(vy); ty = -Math.abs(ty); }
+
+    // 傾き・向きも補間して、切り替わりが瞬間的にならないようにする
+    const wantTilt = Math.max(-24, Math.min(24, vx * 0.055));
+    tilt += (wantTilt - tilt) * (1 - Math.pow(0.004, dt));
+    const wantFlip = vx < -20 ? -1 : (vx > 20 ? 1 : flip);
+    flip += (wantFlip - flip) * (1 - Math.pow(0.02, dt));
+
+    el.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) rotate(${tilt.toFixed(2)}deg) scaleX(${flip.toFixed(3)})`;
+    raf = requestAnimationFrame(step);
+  };
+  raf = requestAnimationFrame(step);
+}
+
+function crashFlyHero(el, x, y, size) {
+  // 手前に迫ってきて激突
+  const cx = x + size / 2, cy = y + size / 2;
+  el.animate([
+    { transform: `translate3d(${x}px, ${y}px, 0) scale(1)`, opacity: 1 },
+    { transform: `translate3d(${x - size * 0.9}px, ${y - size * 0.9}px, 0) scale(2.8)`, opacity: 1, offset: .72 },
+    { transform: `translate3d(${x - size * 1.6}px, ${y - size * 1.6}px, 0) scale(4.6)`, opacity: 0 },
+  ], { duration: 460, easing: 'cubic-bezier(.45,0,.85,.35)', fill: 'forwards' })
+    .onfinish = () => { el.remove(); bigBang(cx, cy); };
+}
+
+// ===== 大爆発 =====
+// 閃光 → 火球 → 衝撃波 → 破片・火の粉・煙 → 画面がひび割れる
+const BOOM_MS = 7000;    // 大爆発の時間
+function bigBang(cx, cy) {
+  const flash = $('flashLayer');
+  const boom = $('boomLayer');
+  const cv = $('boomCanvas');
+  if (!cv || !boom) { flyHeroRunning = false; return; }
+
+  // 画面を強く揺らしてから、徐々に収める
+  document.body.classList.add('shake-hard');
+  setTimeout(() => {
+    document.body.classList.remove('shake-hard');
+    document.body.classList.add('shake');
+    setTimeout(() => document.body.classList.remove('shake'), 900);
+  }, 520);
+
+  // 閃光
+  if (flash) {
+    flash.animate([{ opacity: 0 }, { opacity: 1, offset: .06 }, { opacity: .85, offset: .18 }, { opacity: 0 }],
+      { duration: 900, easing: 'ease-out', fill: 'forwards' });
+  }
+
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = window.innerWidth, H = window.innerHeight;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  boom.classList.add('on');
+
+  const R = Math.hypot(W, H);
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  // 破片・火の粉・煙
+  const parts = [];
+  for (let i = 0; i < 420; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const sp = Math.pow(Math.random(), 0.45) * R * rnd(0.6, 1.9);
+    const kind = Math.random();
+    parts.push({
+      vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+      r: kind < 0.55 ? rnd(2, 7) : rnd(6, 20),
+      rot: Math.random() * Math.PI * 2, vr: rnd(-7, 7),
+      life: kind < 0.55 ? rnd(1.6, 3.6) : (kind < 0.85 ? rnd(2.4, 5.0) : rnd(3.5, 6.6)),
+      type: kind < 0.55 ? 'spark' : (kind < 0.85 ? 'debris' : 'smoke'),
+      hue: rnd(18, 48),
+    });
+  }
+  // 衝撃波リング
+  const rings = [
+    { t: 0,    sp: R * 1.5, w: 18, a: .95, fade: 1.5 },
+    { t: 0.09, sp: R * 1.0, w: 12, a: .75, fade: 1.8 },
+    { t: 0.20, sp: R * 0.7, w: 8,  a: .55, fade: 2.2 },
+    { t: 0.45, sp: R * 0.42, w: 5, a: .40, fade: 3.0 },
+    { t: 0.90, sp: R * 0.26, w: 4, a: .28, fade: 3.6 },
+  ];
+
+  // 二次爆発（時間差で小さな爆発が続く）
+  const bursts = [];
+  for (let i = 0; i < 7; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const d = rnd(R * 0.08, R * 0.34);
+    bursts.push({
+      t: rnd(0.8, 4.4),
+      x: cx + Math.cos(ang) * d,
+      y: cy + Math.sin(ang) * d,
+      r: rnd(R * 0.06, R * 0.16),
+      dur: rnd(0.7, 1.4),
+    });
+  }
+
+  const t0 = performance.now();
+
+  const draw = (now) => {
+    // rAFのタイムスタンプは t0 より前になり得る。負の経過時間は Math.pow で NaN になるため0に丸める
+    const t = Math.max(0, (now - t0) / 1000);
+    g.clearRect(0, 0, W, H);
+
+    // 火球（膨らんでから、ゆっくり燃え尽きる）
+    if (t < 3.2) {
+      const k = t / 3.2;
+      const rr = R * (0.06 + Math.pow(k, 0.55) * 0.5);
+      const a = Math.max(0, Math.pow(1 - k, 1.6));
+      const grad = Number.isFinite(rr) && rr > 0
+        ? g.createRadialGradient(cx, cy, 0, cx, cy, rr) : null;
+      if (grad) {
+        grad.addColorStop(0,    `rgba(255,255,245,${a})`);
+        grad.addColorStop(0.30, `rgba(255,214,120,${a * .92})`);
+        grad.addColorStop(0.62, `rgba(255,122,38,${a * .72})`);
+        grad.addColorStop(1,    'rgba(150,30,0,0)');
+        g.fillStyle = grad;
+        g.beginPath(); g.arc(cx, cy, rr, 0, Math.PI * 2); g.fill();
+      }
+    }
+
+    // 衝撃波
+    for (const ring of rings) {
+      const rt = t - ring.t;
+      if (rt <= 0) continue;
+      const a = Math.max(0, ring.a * (1 - rt / ring.fade));
+      if (a <= 0) continue;
+      g.strokeStyle = `rgba(255,236,196,${a.toFixed(3)})`;
+      g.lineWidth = ring.w * Math.max(.2, 1 - rt);
+      g.beginPath(); g.arc(cx, cy, rt * ring.sp, 0, Math.PI * 2); g.stroke();
+    }
+
+    // 二次爆発
+    for (const bs of bursts) {
+      const bt = t - bs.t;
+      if (bt <= 0 || bt > bs.dur) continue;
+      const k = bt / bs.dur;
+      const rr = bs.r * (0.25 + Math.pow(k, 0.5) * 1.5);
+      const a = Math.max(0, Math.pow(1 - k, 1.5)) * 0.9;
+      if (!Number.isFinite(rr) || rr <= 0) continue;
+      const bg = g.createRadialGradient(bs.x, bs.y, 0, bs.x, bs.y, rr);
+      bg.addColorStop(0,    `rgba(255,252,236,${a})`);
+      bg.addColorStop(0.35, `rgba(255,206,110,${a * .85})`);
+      bg.addColorStop(0.7,  `rgba(255,110,30,${a * .6})`);
+      bg.addColorStop(1,    'rgba(140,26,0,0)');
+      g.fillStyle = bg;
+      g.beginPath(); g.arc(bs.x, bs.y, rr, 0, Math.PI * 2); g.fill();
+    }
+
+    // パーティクル（減速＋重力。連続関数なので滑らか）
+    for (const q of parts) {
+      if (t > q.life) continue;
+      const k = t / q.life;
+      const drag = Math.pow(0.34, t);   // 7秒かけて広がるよう抵抗を弱める
+      const px = cx + q.vx * (1 - drag) * 0.30;
+      const py = cy + q.vy * (1 - drag) * 0.30 + 150 * t * t;
+      const a = Math.max(0, 1 - k);
+      if (q.type === 'spark') {
+        g.fillStyle = `rgba(255,${(180 + q.hue * 1.4) | 0},90,${(a * .95).toFixed(3)})`;
+        g.beginPath(); g.arc(px, py, q.r * (1 - k * .6), 0, Math.PI * 2); g.fill();
+      } else if (q.type === 'debris') {
+        g.save(); g.translate(px, py); g.rotate(q.rot + q.vr * t);
+        g.fillStyle = `rgba(60,48,40,${(a * .9).toFixed(3)})`;
+        g.fillRect(-q.r / 2, -q.r / 3, q.r, q.r * 0.66);
+        g.restore();
+      } else {
+        g.fillStyle = `rgba(${(90 + q.hue) | 0},${(80 + q.hue) | 0},88,${(a * .26).toFixed(3)})`;
+        g.beginPath(); g.arc(px, py, q.r * (1 + k * 5.2), 0, Math.PI * 2); g.fill();
+      }
+    }
+
+    if (t * 1000 < BOOM_MS) requestAnimationFrame(draw);
+    else {
+      boom.classList.remove('on');
+      g.clearRect(0, 0, W, H);
+      flyHeroRunning = false;   // 次の抽選で再発生できるようにする
+    }
+  };
+  requestAnimationFrame(draw);
 }
 
 async function init() {
