@@ -47,6 +47,9 @@
   .bgfx b:nth-child(7){left:6%;top:38%;animation-delay:2s} .bgfx b:nth-child(8){left:55%;top:30%;width:3px;height:3px;animation-delay:1.4s}
   /* 流れ星（JSでランダム生成） */
   .shooting-layer { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+  /* 巨大隕石はカードの手前を通す（背景だと本体に隠れて見えないため）。
+     レアキャラ(60)より下、本体(1)より上。 */
+  .meteor-layer { position:fixed; inset:0; z-index:40; pointer-events:none; overflow:hidden; }
   .shooting { position:absolute; height:2px; width:140px; border-radius:2px; opacity:0;
     background:linear-gradient(90deg, rgba(191,233,255,0) 0%, rgba(191,233,255,.35) 60%, #ffffff 100%);
     box-shadow:0 0 8px 1px rgba(150,225,255,.75); transform-origin:left center; }
@@ -258,7 +261,7 @@
     100% { transform:none }
   }
   @media (prefers-reduced-motion: reduce) {
-    .fly-hero, #boomLayer, #flashLayer { display:none !important; }
+    .fly-hero, #boomLayer, #flashLayer, .meteor-layer { display:none !important; }
     .shake { animation:none !important; }
   }
 
@@ -296,6 +299,7 @@
 <body>
 <div class="bgfx"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
 <div class="shooting-layer" id="shootingLayer"></div>
+<div class="meteor-layer" id="meteorLayer" aria-hidden="true"></div>
 <div id="boomLayer" aria-hidden="true"><canvas id="boomCanvas"></canvas></div>
 <div id="flashLayer" aria-hidden="true"></div>
 <div class="wrap">
@@ -1050,10 +1054,11 @@ function spawnShootingStar() {
   ], { duration: 650 + Math.random() * 650, easing: 'ease-in' }).onfinish = () => star.remove();
 }
 function spawnMeteor() {
-  const layer = $('shootingLayer');
+  // 背景レイヤーだと .wrap(z-index:1) に隠れてほぼ見えないため、専用の前面レイヤーへ出す
+  const layer = $('meteorLayer') || $('shootingLayer');
   if (!layer) return;
   const vw = window.innerWidth, vh = window.innerHeight;
-  const head = Math.min(vw, vh) * 0.66;      // 炎玉の直径（画面の約2/3）
+  const head = Math.min(vw, vh) * 0.52;      // 炎玉の直径（画面の約半分）
   const tail = head * 2.4;                    // 尾を引く炎
   const W = tail + head, H = head;
 
@@ -1078,18 +1083,31 @@ function spawnMeteor() {
   m.appendChild(tailEl);
   m.appendChild(orb);
 
-  const angle = 22 + Math.random() * 16;                 // 緩い下降 22〜38°
-  const startX = -W + head * 0.2 + Math.random() * vw * 0.15;   // 炎玉が左上あたりから
-  const startY = -head * 0.4 + Math.random() * vh * 0.12;
-  const dist = (vw + vh) * (1.05 + Math.random() * 0.25);
+  // 軌道は画面サイズから逆算する。
+  // 固定角度だと横長の画面で「横断する前に下へ抜ける」ため、
+  // 「横方向に画面を渡り切る間に、縦方向は画面の45〜95%だけ落ちる」角度を求める。
+  const travelX = vw + head;                              // 炎玉が左端外→右端外まで進む距離
+  const dropY = vh * (0.45 + Math.random() * 0.5);        // その間に落ちる量
+  const rad = Math.atan2(dropY, travelX);
+  const angle = rad * 180 / Math.PI;                      // 実測でおよそ12〜25°
+  const dist = Math.hypot(travelX, dropY);
+
+  // 炎玉が画面左外のやや上から入るよう、要素の起点を逆算する
+  // （.met-orb は要素の右端にあり、回転は左端中央が基準）
+  const armX = (W - head / 2) * Math.cos(rad);
+  const armY = (W - head / 2) * Math.sin(rad);
+  const orbStartY = vh * (0.05 + Math.random() * 0.18);
+  const startX = -head / 2 - armX;
+  const startY = orbStartY - H / 2 - armY;
   m.style.left = startX + 'px';
   m.style.top = startY + 'px';
   layer.appendChild(m);
 
+  // 前面を通るため、本体の文字が読めるよう最大0.82に抑える
   m.animate([
     { transform: `rotate(${angle}deg) translateX(0) scale(.9)`, opacity: 0 },
-    { opacity: 1, offset: 0.12 },
-    { opacity: 1, offset: 0.85 },
+    { opacity: .82, offset: 0.12 },
+    { opacity: .82, offset: 0.85 },
     { transform: `rotate(${angle}deg) translateX(${dist}px) scale(1.28)`, opacity: 0 },
   ], { duration: 7500 + Math.random() * 3000, easing: 'linear' }).onfinish = () => m.remove();  // ゆっくり(7.5〜10.5秒)
 }
