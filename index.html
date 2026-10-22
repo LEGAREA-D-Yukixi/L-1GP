@@ -414,6 +414,8 @@
       <input id="apName" type="text" maxlength="100" placeholder="氏名">
       <label for="apNote">詳細・理由</label>
       <textarea id="apNote" rows="3" maxlength="2000" placeholder="内容の補足があれば記入"></textarea>
+      <label for="apRunAt">予約日時（空欄なら今すぐ申請）</label>
+      <input type="datetime-local" id="apRunAt">
       <button class="btn" id="apSubmit">申請する</button>
       <div id="apMsg" class="msg"></div>
     </div>
@@ -740,20 +742,45 @@ async function submitRequest() {
     : $('apEarner').value.trim();
   const payload = { division_id:input.division_id, rule_id:rule.id, occurred_on:input.occurred_on, requester_name:input.requester_name.trim(), requester_email:null, earner_name:(earner || null), note:input.note || null };
   if (rule.is_variable) payload.points = v.points;
-  const { error } = await sb.rpc('l1_submit_request', {
-    p_division_id: payload.division_id,
-    p_rule_id: payload.rule_id,
-    p_occurred_on: payload.occurred_on,
-    p_requester_name: payload.requester_name,
-    p_requester_email: payload.requester_email,
-    p_earner_name: payload.earner_name,
-    p_note: payload.note,
-    p_points: (payload.points ?? null)
-  });
+  const runAtRaw = $('apRunAt') ? $('apRunAt').value : '';
+  let error;
+  if (runAtRaw) {
+    // 予約: datetime-local はローカル時刻なので ISO に変換して渡す
+    const runAt = new Date(runAtRaw);
+    if (isNaN(runAt.getTime()) || runAt <= new Date()) {
+      $('apSubmit').disabled = false;
+      msg.className='msg ngmsg'; msg.textContent='予約日時は未来を指定してください。'; return;
+    }
+    ({ error } = await sb.rpc('l1_schedule_request', {
+      p_division_id: payload.division_id,
+      p_rule_id: payload.rule_id,
+      p_occurred_on: payload.occurred_on,
+      p_earner_name: payload.earner_name,
+      p_note: payload.note,
+      p_points: (payload.points ?? null),
+      p_run_at: runAt.toISOString()
+    }));
+  } else {
+    ({ error } = await sb.rpc('l1_submit_request', {
+      p_division_id: payload.division_id,
+      p_rule_id: payload.rule_id,
+      p_occurred_on: payload.occurred_on,
+      p_requester_name: payload.requester_name,
+      p_requester_email: payload.requester_email,
+      p_earner_name: payload.earner_name,
+      p_note: payload.note,
+      p_points: (payload.points ?? null)
+    }));
+  }
   $('apSubmit').disabled = false;
-  if (error) { msg.className='msg ngmsg'; msg.textContent='申請に失敗しました: ' + error.message; return; }
-  msg.className='msg okmsg'; msg.textContent='申請を受け付けました。運営の承認後にダッシュボードへ反映されます。';
+  if (error) { msg.className='msg ngmsg'; msg.textContent=(runAtRaw?'予約':'申請')+'に失敗しました: ' + error.message; return; }
+  msg.className='msg okmsg';
+  msg.textContent = runAtRaw
+    ? '申請を予約しました。指定日時に自動で申請されます（申請状況タブで確認・削除できます）。'
+    : '申請を受け付けました。運営の承認後にダッシュボードへ反映されます。';
   $('apNote').value=''; $('apPoints').value=''; $('apEarner').value=''; if ($('apEarnerSel')) $('apEarnerSel').value='';
+  if ($('apRunAt')) $('apRunAt').value='';
+  myReqRows = null;   // 申請状況を取り直させる
 }
 
 // メンバー名簿を読み込み: 申請者名の自動入力（ログイン氏名）＋獲得者プルダウン
@@ -795,9 +822,16 @@ function populateEarnerByDivision() {
 let myReqRows = null;      // null=未取得 / 配列=取得済み
 let myReqError = null;
 
+let mySchedRows = null;
+
 async function loadMyRequests() {
-  myReqRows = null; myReqError = null;
+  myReqRows = null; myReqError = null; mySchedRows = null;
   renderMyRequests();
+  // 予約一覧（失敗しても未承認申請の表示は止めない）
+  try {
+    const { data: sc } = await sb.rpc('l1_my_scheduled_requests');
+    mySchedRows = Array.isArray(sc) ? sc : [];
+  } catch { mySchedRows = []; }
   // 本人判定はサーバー側で行う（氏名をクライアントから渡すと他人の申請を覗けてしまうため引数なし）
   const { data, error } = await sb.rpc('l1_my_pending_requests');
   if (error) {
@@ -806,6 +840,50 @@ async function loadMyRequests() {
     myReqRows = Array.isArray(data) ? data : [];
   }
   renderMyRequests();
+}
+
+function schedTableHTML() {
+  if (!mySchedRows || mySchedRows.length === 0) return '';
+  return `<div style="margin:14px 0 6px;font-weight:800">予約中の申請</div>`
+    + `<div style="overflow-x:auto"><table class="reqtbl"><thead><tr>`
+    + `<th>予約日時</th><th>発生日</th><th>Division</th><th>項目</th><th style="text-align:right">pt</th>`
+    + `<th>獲得者</th><th>詳細</th><th></th></tr></thead><tbody>`
+    + mySchedRows.map(r => {
+        const pts = Number(r.points || 0);
+        return `<tr>
+          <td style="white-space:nowrap;font-weight:700">${esc(r.run_at ? new Date(r.run_at).toLocaleString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '')}</td>
+          <td style="white-space:nowrap">${esc(r.occurred_on ?? '')}</td>
+          <td>${esc(r.division_name ?? '')}</td>
+          <td class="col-rule">${esc([r.category, r.label].filter(Boolean).join('｜'))}</td>
+          <td style="text-align:right;white-space:nowrap" class="${pts >= 0 ? 'add' : 'deduct'}">${esc(formatPoints(pts))}</td>
+          <td style="white-space:nowrap">${esc(r.earner_name ?? '')}</td>
+          <td class="muted">${esc(r.note ?? '')}</td>
+          <td style="white-space:nowrap"><button class="btn sm red" data-delsched="${esc(r.id)}">削除</button></td>
+        </tr>`;
+      }).join('')
+    + '</tbody></table></div>';
+}
+
+async function deleteMySched(id, btn) {
+  if (!id) return;
+  if (!confirm('この予約を削除します。よろしいですか？')) return;
+  const msg = $('myReqMsg');
+  if (btn) { btn.disabled = true; btn.textContent = '削除中…'; }
+  const { error } = await sb.rpc('l1_delete_my_scheduled_request', { p_id: id });
+  if (error) {
+    if (msg) { msg.className = 'msg ngmsg'; msg.style.display = 'block'; msg.textContent = '削除に失敗しました: ' + error.message; }
+    if (btn) { btn.disabled = false; btn.textContent = '削除'; }
+    return;
+  }
+  if (msg) { msg.className = 'msg okmsg'; msg.style.display = 'block'; msg.textContent = '予約を削除しました。'; }
+  await loadMyRequests();
+}
+
+function bindMyReqButtons(body) {
+  body.querySelectorAll('[data-delreq]').forEach(b =>
+    b.addEventListener('click', () => deleteMyRequest(b.dataset.delreq, b)));
+  body.querySelectorAll('[data-delsched]').forEach(b =>
+    b.addEventListener('click', () => deleteMySched(b.dataset.delsched, b)));
 }
 
 function renderMyRequests() {
@@ -820,7 +898,8 @@ function renderMyRequests() {
   }
   if (myReqRows === null) { body.innerHTML = '<div class="muted">読み込み中…</div>'; return; }
   if (myReqRows.length === 0) {
-    body.innerHTML = '<div class="muted">承認待ちの申請はありません。</div>';
+    body.innerHTML = '<div class="muted">承認待ちの申請はありません。</div>' + schedTableHTML();
+    bindMyReqButtons(body);
     return;
   }
   body.innerHTML = `<div style="overflow-x:auto"><table class="reqtbl"><thead><tr>`
@@ -841,9 +920,8 @@ function renderMyRequests() {
           <td style="white-space:nowrap"><button class="btn sm red" data-delreq="${esc(r.id)}">削除</button></td>
         </tr>`;
       }).join('')
-    + '</tbody></table></div>';
-  body.querySelectorAll('[data-delreq]').forEach(b =>
-    b.addEventListener('click', () => deleteMyRequest(b.dataset.delreq, b)));
+    + '</tbody></table></div>' + schedTableHTML();
+  bindMyReqButtons(body);
 }
 
 async function deleteMyRequest(id, btn) {
